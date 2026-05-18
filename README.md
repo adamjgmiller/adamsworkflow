@@ -128,6 +128,14 @@ The flow I actually run on a non-trivial feature, migration, or refactor:
    feature set, migration, refactor), I'll usually run another two or
    three review/fix cycles before I'm satisfied.
 
+**Read the PRD yourself. Skim the Plan when the work matters.** The PRD
+and Plan are where intent gets encoded before any code is written, and
+the downstream review loops can only verify that *the implementation
+matches the plan* — they can't catch a plan that confidently builds the
+wrong thing. Manual PRD review is the load-bearing check in this whole
+workflow; the `/review-fix-loop` in step 3 catches consistency and
+readiness issues, not "this is the wrong approach."
+
 ## Commands
 
 Tiered: bigger commands get a paragraph, utilities get a line.
