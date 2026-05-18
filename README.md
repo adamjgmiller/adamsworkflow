@@ -212,10 +212,6 @@ non-trivial decisions to lock down before code.
   to share usefully. The patterns that matter (blast-radius discipline,
   sub-agent delegation, plan-first workflow) are referenced inside the
   commands themselves where they're load-bearing.
-- **`deep-research`** — third-party skill I tried and didn't keep. If
-  you want it, install
-  [the original](https://github.com/199-biotechnologies/claude-deep-research-skill)
-  directly.
 
 ## Acknowledgments
 
