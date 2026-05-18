@@ -98,6 +98,36 @@ The commands aren't isolated. They nest:
 If you only take one thing: `/quick-dual-review` is the cheapest taste of
 the pattern. The rest are scaffolding on top.
 
+## Example: how I work on a meaningful task
+
+The flow I actually run on a non-trivial feature, migration, or refactor:
+
+1. **Goal + `/grill-me`.** State the goal, then let the agent interview me
+   until every branch of the decision tree is resolved.
+2. **PRD.** Have the agent write a PRD from the grill-me conversation.
+3. **Plan + review the plan.** Have the agent write an implementation plan
+   from the PRD, then run `/review-fix-loop /quick-dual-review` against
+   the *plan itself* — checking consistency with the PRD, consistency
+   with the codebase, internal consistency, and general readiness for
+   agentic execution.
+4. **`/orchestrate` + review the code.** Have the agent orchestrate the
+   implementation against the approved plan, then run
+   `/review-fix-loop /quick-dual-review` on the resulting diff. For UI
+   work I fold Playwright testing into the review loop when it's
+   appropriate.
+5. **`/adamsreview:review --ensemble`** — multi-lens review with a Codex
+   pass and a PR-bot-comment scrape pooled on top.
+6. **`/adamsreview:walkthrough`** — interactive pass through the
+   borderline findings `:fix` would skip; I promote the ones I want
+   auto-fixed.
+7. **`/ar:fix-and-verify`** — apply the surviving auto-fixable findings,
+   then loop dual-review on the fix delta until it converges (or
+   surfaces what it can't clean up).
+8. **Preview, decide, loop if needed.** Exercise the actual functionality
+   in a real browser / runtime. For a really complex PR (major new
+   feature set, migration, refactor), I'll usually run another two or
+   three review/fix cycles before I'm satisfied.
+
 ## Commands
 
 Tiered: bigger commands get a paragraph, utilities get a line.
