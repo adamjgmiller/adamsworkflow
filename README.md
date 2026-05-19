@@ -16,8 +16,8 @@ install.sh       →  --copy or --symlink, both supported
 ```
 
 Nothing else. No global `CLAUDE.md` snippets, no philosophy essay, no
-guided tour. Read the per-command paragraphs below, install what looks
-useful, open a few `.md` files when you want detail.
+onboarding walkthrough. Read the per-command paragraphs below, install
+what looks useful, open a few `.md` files when you want detail.
 
 ## Install
 
@@ -197,6 +197,22 @@ git ops — won't `-D`, won't `--force`, won't close PRs to "make it
 work". Assumes you're repo admin and have authorized `gh pr merge
 --admin` to bypass branch protection (missing approvals, out-of-date
 branches, etc.) — review the file before running it if that's not you.
+
+### `/guided-tour`
+
+Curates a clickable markdown tour of a diff, subsystem, or codebase —
+VSCode turns the `/src/...#L42` links into one-click navigation, so the
+tour guides your attention while you read the actual code. Auto-detects
+scope (branch diff vs. merge-base, current session's work, whole
+codebase) or takes `--branch` / `--session` / `--range` / `--path` /
+`--codebase` / `--pr <n>`. Tours run 5–8 stops for diffs, 5–10 for
+codebase tours, with optional ASCII shape diagrams and a TL;DR table at
+the bottom. The non-obvious bit: `--session` introspects this
+conversation's history (what the agent actually did in the window),
+not just recent commits — and refuses with a "did you mean `--branch`?"
+if the session is empty, rather than silently approximating from `git
+log`. I reach for this when I need to hand a teammate (or future me) a
+map of a non-trivial branch without writing the walkthrough by hand.
 
 ### `/quick-review`
 
