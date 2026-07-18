@@ -131,7 +131,7 @@ TSNET_EXCL=''
 # does not flag its own source, and this comment avoids the literal form), so a
 # real root-home path leak matches while bare "/root" prose (docs, commit
 # messages) and /rootfs, /rootkit do NOT.
-HOMEPATH_RE='/home/[a-z0-9_]+|/Users/[A-Za-z0-9_]+|[/]root/[A-Za-z0-9._]'
+HOMEPATH_RE='/home/[a-z0-9_]+|/Users/[A-Za-z0-9_]+|[/]root/[A-Za-z0-9._-]'
 HOMEPATH_EXCL='^(/home/user|/Users/user)$'
 
 CRED_RE='AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'

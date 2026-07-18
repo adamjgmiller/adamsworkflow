@@ -72,6 +72,22 @@ if ! target_abs="$(cd "$TARGET_DIR" 2>/dev/null && pwd -P)"; then
   done
   target_abs="$( (cd "$_t" 2>/dev/null && pwd -P) || printf '%s' "$_t" )$_tail"
 fi
+# Lexically collapse any . and .. segments so a path like
+# <parent>/missing/../<repo> can't dodge the guard below by its string form.
+# The existing part was resolved with pwd -P (symlink-free) and the
+# non-existent tail has no symlink components, so lexical normalization is
+# correct here. noglob so a segment with shell metachars can't expand.
+_norm=""; _oIFS=$IFS
+set -f; IFS=/
+for _seg in $target_abs; do
+  case "$_seg" in
+    ''|.) ;;
+    ..)   _norm="${_norm%/*}" ;;
+    *)    _norm="$_norm/$_seg" ;;
+  esac
+done
+IFS=$_oIFS; set +f
+target_abs="${_norm:-/}"
 if [[ "$target_abs" == "$REPO_DIR" || "$target_abs" == "$REPO_DIR"/* ]]; then
   echo "Error: target ($target_abs) is the source repo or a directory inside it." >&2
   echo "Pick a target outside $REPO_DIR (unset CLAUDE_HOME to use ~/.claude)." >&2
