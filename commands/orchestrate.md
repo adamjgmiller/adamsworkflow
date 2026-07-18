@@ -1,5 +1,5 @@
 ---
-description: Plan or implement a multi-stage task with a build journal, per-stage verify loops, and sub-agent delegation
+description: Plan or execute a multi-stage task with a build journal, per-stage stage-runners, and verify loops — the staged-execution engine. For a full docs→PR pipeline from a raw request, use build-system instead.
 argument-hint: (paste a plan, a request, or a plan-file path — mode is inferred)
 ---
 
@@ -11,10 +11,23 @@ journal, per-stage verify loops, and aggressive sub-agent delegation.
 
 You are a conductor, not a performer. Most per-step work — editing files,
 running verifies, diagnosing failures, reviewing the cumulative diff —
-belongs to sub-agents that return condensed reports. The orchestrator holds
-coordination state, makes the judgment calls (advance / retry / halt /
-replan), and handles the tasks no sub-agent can reasonably do. This keeps
-the main context clean so you can stay coherent across a long run.
+belongs to delegated agents that return condensed reports. In execute mode
+the unit of delegation is a whole stage: one stage-runner per stage, which
+runs the stage's cycle loop internally and fans out its own leaf children
+(a *stage* = a coupling boundary, not a plan-numbering unit — see Division
+of labor).
+The orchestrator holds coordination state, makes the judgment calls
+(advance / retry / halt / replan), and handles the tasks no sub-agent can
+do at all — above all, talking to the user. This keeps the main context
+clean so you can stay coherent across a long run.
+
+Scope: this command is the staged-execution engine. A raw feature request that warrants
+docs + PR ceremony belongs to the Build System skill; that skill may use `/orchestrate`
+as its build-phase driver *instead of* its own build loop — one driver or the other,
+never nested. Use `/orchestrate` directly when you have (or will write) a plan and want
+execution without that pipeline. On pushing: any autonomous-push pre-approval your
+global CLAUDE.md may carry doesn't reach this command — its documented exit is a local
+branch handed back for approval, so the never-push gate below stands.
 
 ## Triage
 
@@ -71,6 +84,19 @@ a journal at `plans/<topic>-execution.md`."*
 Applies to both modes, but matters most in execute mode.
 
 **Delegate to sub-agents (the default — reach for this first):**
+- **A whole execute-mode stage: one stage-runner per non-interactive
+  stage.** A *stage* for dispatch purposes is a coupling boundary, not a
+  plan-numbering unit — plan stages are commit cadence, agent boundaries
+  are coupling boundaries. Merge tightly-coupled plan stages (chapters of
+  one artifact, strictly sequential, shared invariants) into one
+  stage-runner briefed to commit per plan-stage; fan out only at genuine
+  artifact/module boundaries or parallelizable work. Dispatched
+  sub-agents can spawn their own children
+  (`~/.claude/docs/field-notes.md` §1), so the stage-runner runs the full build → verify → diagnose
+  cycle internally — fanning out its own builder/verifier/diagnoser
+  leaves — commits per the convention you brief, and returns one compact
+  bundle. The next three bullets describe the children *it* fans out, not
+  extra dispatches from you.
 - Per-step build/edit work: the sub-agent reads the target files, makes the
   edits, and reports back what it changed.
 - Verify runs whose output is verbose: the sub-agent runs the check,
@@ -84,19 +110,35 @@ Applies to both modes, but matters most in execute mode.
 
 **Keep in the orchestrator (do not delegate — these are coordination):**
 - Triage (mode selection).
+- **Every user gate and every live-context step.** Plan approval
+  (`ExitPlanMode`), the halt-after-3 report, push/PR authorization, and
+  anything that reads the live conversation stay on the main loop —
+  dispatched sub-agents carry no `AskUserQuestion` tool at all
+  (field-notes §3). A delegated agent that hits a question only the user can
+  answer returns it as *data* — a packaged pending decision — and you
+  surface it (via `AskUserQuestion`, or `/askme` when several have
+  queued). Never let a sub-agent guess its way past a gate.
 - Reading and updating the build journal — cursor state is coordination,
   not work.
-- **Reconciling sub-agent reports against `git diff`.** Sub-agent reports
-  describe *intent*; the diff is *truth*. If a reported change isn't in
-  the diff, it didn't happen — re-dispatch, don't advance. This is the
-  single most common cause of orchestrators drifting from reality: a
-  confident "I updated X, Y, Z and tests pass" report paired with an
-  empty or partial diff. Trust the diff.
-- `git add` + `git commit` using the repo's commit-message conventions
-  (one orchestrator keeping commit style consistent beats briefing every
-  sub-agent on it).
+- **The top level of recursive trust-the-diff.** Reports describe
+  *intent*; the diff is *truth* — at every level. The stage-runner
+  reconciles its children's reports against the `git diff` it holds
+  locally; you verify every commit SHA it returns resolves on HEAD
+  (`git cat-file -e <sha>`) and spot-read the stage's diff before
+  journaling or advancing. If a reported change isn't in the diff — or a
+  reported SHA isn't on HEAD — it didn't happen: re-dispatch, don't
+  advance. This is the single most common cause of orchestrators
+  drifting from reality: a confident "I updated X, Y, Z and tests pass"
+  report paired with an empty or partial diff. Trust the diff.
+- Commit POLICY, not each commit. Scan `git log` once for the repo's
+  commit-message convention and brief it verbatim into every
+  stage-runner; the stage-runner executes its own stage's commits. Style
+  consistency comes from one conductor briefing one convention — and
+  SHA-verifying what comes back — rather than from one agent typing
+  every message.
 - Between-stage reassessment: has the stage's output invalidated a later
-  stage's premise?
+  stage's premise? A stage-runner never owns this — it sees its own
+  stage, not the cumulative cross-stage picture.
 - Advance / retry / halt decisions.
 - Synthesis at the end of the once-over: deciding what to fix, what to
   flag, what to defer.
@@ -104,28 +146,39 @@ Applies to both modes, but matters most in execute mode.
   agent couldn't apply on its own.
 
 **Pick the sub-agent type by fit:**
-- `general-purpose` — default for per-step build/edit/verify work, and for
-  the final once-over when briefed as a reviewer.
+- `stage-runner` — one per execute-mode stage; the named def at
+  `~/.claude/agents/stage-runner.md` carries the role contract. If the
+  type is unknown ("Agent type not found" — the agent registry loads at
+  session start), dispatch `general-purpose` briefed to read and follow
+  that file as its full contract.
+- `general-purpose` — default for one-off delegated work and the final
+  once-over reviewer; also the type the stage-runner's own leaf children
+  typically run as.
 - `Explore` — investigation (deep codebase search, multi-location reads).
-- `Plan` — in-stage replanning when a step's premise turns out wrong, or
-  pre-plan reconnaissance during plan mode.
-- `code-simplifier:code-simplifier` — when a step is explicitly "clean up / refactor".
+  Note `Explore`/`Plan` types lack the `Agent` tool — fine for leaves,
+  never as a stage-runner stand-in.
+- `Plan` — replanning when a returned halt invalidates a stage's premise,
+  or pre-plan reconnaissance during plan mode.
 
-**External reviewers (CLI-invoked, not sub-agent types):** Codex CLI —
-a `general-purpose` sub-agent follows the `/codex-consult` skill
-(`~/.claude/skills/codex-consult/SKILL.md`) in **`review` mode**, which
-encodes the diff-scope decision tree, the two CLI gotchas, and a
-prescribed findings format. Use alongside the `general-purpose` reviewer
-for second opinions on high-stakes stages or final close-outs — Codex
-is GPT-driven, so disagreements with the Claude-driven reviewer are
-real signal.
+**External reviewers (Codex CLI):** dispatch the named `codex-runner`
+agent — its def (`~/.claude/agents/codex-runner.md`) carries the full
+runner contract: follow the `codex-consult` skill (diff-scope decision
+tree, CLI gotchas, prescribed findings format) in **`review` mode**,
+return `JOB_ID` + sentinel `exit=N` + findings verbatim, never skip,
+never substitute its own review. Use alongside the `general-purpose`
+reviewer for second opinions on high-stakes stages or final close-outs —
+Codex is GPT-driven, so disagreements with the Claude-driven reviewer are
+real signal. The two reviewers are **siblings** you dispatch
+side-by-side; the Claude reviewer never spawns the Codex one. Brief the
+`general-purpose` reviewer **read-only** — it reads and reports, never
+edits files or mutates git state.
 
 When you dispatch a sub-agent, say so in the same turn — one line naming
 the agent type and the scope. Don't narrate it after the fact.
 
-Plugin-namespaced agents (those with `:` in the name, like
-`code-simplifier:code-simplifier`) come from installed plugins and may
-not be available in every environment. External CLI tools like `codex`
+Plugin-namespaced agents (those with `:` in the name) come from
+installed plugins and may not be available in every environment.
+External CLI tools like `codex`
 may not be installed either. Before dispatching a plugin agent, verify
 it appears in your available agent types list; before briefing a
 sub-agent to invoke the `codex` CLI, verify with `command -v codex`.
@@ -143,7 +196,7 @@ your findings, fix the bug") — decide what you want done, then say so.
 
 ## Plan mode
 
-Don't write code in this mode. Produce a structured plan. Step 6 governs what happens after the plan is presented.
+Don't write code in this mode. Produce a structured plan. Item 6 below governs what happens after the plan is presented.
 
 1. Read the request (pasted prose, prior context, or referenced file).
    Identify: the end-goal, natural stage boundaries, inter-stage
@@ -225,70 +278,132 @@ Don't write code in this mode. Produce a structured plan. Step 6 governs what ha
 
    The orchestrator (you) owns the journal end-to-end. Sub-agents don't
    write to it — they report results, and you translate those results
-   into journal entries.
+   into journal entries. Stated deliberately, as a tradeoff we accept: a
+   stage-runner's internal cycle state (which cycle it's on, child
+   reports, diagnoses) is ephemeral and never journaled. A crash or
+   compaction mid-stage loses it, and journal-cursor recovery re-runs
+   the WHOLE stage from cycle 1. Per-cycle journaling would put the
+   journal back in your hot loop and forfeit the context win — instead,
+   keep stages sized so a full re-run is tolerable.
 
-3. **Per-stage loop** — for each stage in plan order, run the **cycle**
-   below up to **3 times**. A stage advances when its verify passes
-   within those 3 cycles; if all 3 fail, halt and report to the user.
-   A cycle = build → spot-check → verify → (on pass: commit & advance |
-   on fail: diagnose, then next cycle).
+3. **Per-stage loop** — for each stage in plan order, dispatch **one
+   stage-runner** (type `stage-runner`; stale-registry fallback per *Pick
+   the sub-agent type by fit*). Pass an explicit `model:` on every
+   stage-runner dispatch — default `opus` (a conductor), `fable` only
+   when one of the stage's own children may warrant Fable per the
+   policy's escalation test (per-stage call); never leave it to inheritance — an unpinned dispatch inherits
+   the session model, auto-Fabling the conductor on a Fable session.
+   The stage-runner runs the stage's cycle
+   internally, up to
+   **3 times**, fanning out its own builder/verifier/diagnoser leaves,
+   and returns one compact bundle: outcome (`pass`|`fail`|`halt`),
+   cumulative diff + commit SHA(s), a findings/decisions digest, and any
+   packaged human-decision. A stage that genuinely needs live user input
+   mid-stage (rare; plan-flagged) stays on the main loop instead —
+   delegate only non-interactive stages.
 
-   **One cycle:**
+   Depth check: you(0) → stage-runner(1) → its leaves(2) — comfortably
+   inside the ~3–4-level convention (Agent dispatch = +1, inline skill/command = +0;
+   field-notes §5).
 
-   a. **Build.** Dispatch a sub-agent with the stage's goal, target
+   **The brief** — the def's variables, filled per stage, plus this
+   command's own rules:
+
+   - **Goal / Targets (absolute paths) / Verify** — straight from the
+     plan stage.
+   - **Repo root:** `<abs path>` — run the verify command and every
+     git operation from here (`cd` at the start of each Bash call or
+     `git -C`; sub-agent cwd does not persist between calls).
+   - **Leaf dispatches: async-only.** Each leaf's result arrives as a
+     task-notification carrying its final text (re-waking you if
+     you've stopped) — count your dispatches and collect every leaf's
+     notification before advancing the stage (field-notes §4).
+   - **Budget: 3 cycles.**
+   - **Commit contract:** commit at natural breakpoints per the repo's
+     convention — include the convention verbatim (you scanned `git log`
+     for it once); blast-radius discipline before each commit; leaf
+     children never commit.
+   - **Push contract: NEVER.** This command's never-push gate (Working
+     rules) carries down into every stage-runner brief, every time — no
+     stage-runner may push or open a PR.
+   - **Patch-vs-halt:** routine bugs found in prior-stage code — typos,
+     missed cases, small corrections that preserve the original intent —
+     patch in-line, as a separate commit whose message names the
+     upstream patch (e.g. *"fix: parseTimestamp now uses UTC (patch from
+     stage 2)"*) so the log stays honest about what landed where. Return
+     `halt` — packaged, mid-budget, unresolved — the moment continuing
+     would require redesigning the plan: the plan's premise is
+     invalidated, the verify check itself is wrong, or the fix would
+     substantively *reshape* a prior stage's intent (a rewrite, not a
+     patch). The stage-runner never replans on its own, and it does
+     **not** own between-stage premise reassessment — that's yours
+     (step 4).
+   - **Verify contract:** never skip or weaken the verify to make
+     progress — a verify you believe is wrong is a `halt` (patch-vs-halt
+     above), not an edit.
+   - **Conditions reserved for the human:** any decision the plan flags
+     for the user, plus the patch-vs-halt boundary above.
+
+   **The cycle the stage-runner runs** (brief it on this shape — it's
+   the same loop this command used to run at top level):
+
+   a. **Build.** Fan out a builder leaf with the stage's goal, target
       files, and verify criterion. Prompt: *"Make the edits; report back
       what you changed. Do not commit."* On cycles 2 and 3, include the
-      prior cycle's failure report and diagnosis as context. Pick the
-      sub-agent type by fit (see Division of labor).
+      prior cycle's failure report and diagnosis as context.
 
-   b. **Spot-check.** Orchestrator reads the diff (`git diff`). If the
-      diff doesn't match intent, skip verify and go to (d) — a wasted
-      build burns a cycle.
+   b. **Spot-check.** The stage-runner reads its local `git diff`. If
+      the diff doesn't match intent, skip verify and go to (d) — a
+      wasted build burns a cycle.
 
    c. **Verify.** Run the stage's verify check. For mechanical verifies
       (tests exit 0, smoke passes, type-check succeeds), the builder
-      can report the result inline or the orchestrator runs the command
-      directly. For semantic verifies (intent match, behavior
-      preservation, regression scan), dispatch a separate verify
-      sub-agent so the builder doesn't grade its own homework.
+      can report the result inline or the stage-runner runs the command
+      itself. For semantic verifies (intent match, behavior
+      preservation, regression scan), a separate verify leaf, so the
+      builder doesn't grade its own homework.
 
-      - **On pass:** orchestrator commits at natural breakpoints (scan
-        `git log` for the repo's commit-message style). One commit per
-        cohesive change; don't batch a whole stage into one commit
-        unless the stage is atomic. Log the stage to the journal with
-        commit SHA(s) and verify delta. Advance the cursor. **Stage
-        complete — exit cycle loop.**
+      - **On pass:** the stage-runner commits per its briefed
+        convention — one commit per cohesive change; don't batch a
+        whole stage into one commit unless the stage is atomic — and
+        returns its bundle. **Stage complete — exit cycle loop.**
 
       - **On fail:** go to (d).
 
-   d. **Diagnose.** On cycles 1 and 2, dispatch a diagnose sub-agent
-      with the failure report (and the diff, if spot-check was the
-      failure) to identify root cause. The diagnosis feeds the next
-      cycle's build prompt. On cycle 3, the orchestrator inspects
-      directly — if two delegated cycles missed the same issue, a third
-      delegate rarely helps. Increment cycle count; return to (a) if
-      cycle ≤ 3, else halt.
+   d. **Diagnose.** On cycles 1 and 2, a diagnose leaf gets the failure
+      report (and the diff, if spot-check was the failure) to identify
+      root cause; the diagnosis feeds the next cycle's build prompt. On
+      cycle 3, the stage-runner inspects directly — if two delegated
+      cycles missed the same issue, a third delegate rarely helps.
+      Increment cycle count; return to (a) if cycle ≤ 3, else return
+      `fail` with the accumulated failure + diagnosis reports.
 
-      **Halt early when the root cause requires a decision the plan
-      doesn't cover.** Routine bugs in prior-stage code — typos, missed
-      cases, small corrections that preserve the original intent —
-      should be fixed in-line by the next cycle's builder. Record those
-      as a separate commit with a message that names the upstream
-      patch (e.g. *"fix: parseTimestamp now uses UTC (patch from stage
-      2)"*) so the log stays honest about what landed where. Halt only
-      when continuing would require redesigning the plan: the plan's
-      premise is invalidated, the verify check itself is wrong, or the
-      fix would substantively *reshape* a prior stage's intent (a
-      rewrite, not a patch).
+   **On return (conductor work — never delegate this):**
 
-   **After 3 failed cycles:** halt and report to the user with the
-   accumulated failure + diagnosis reports. Never skip verify, weaken
-   the check, or edit the plan silently to make progress. When halting,
-   offer the user a concrete choice: *revert stage X*, *replan stage Y*,
-   or *adjust the verify* — don't just dump the failure.
+   - **Verify the SHAs.** Every commit SHA in the bundle must resolve on
+     HEAD: `git cat-file -e <sha>`. This is recursive trust-the-diff:
+     the stage-runner reconciled its children against its local diff;
+     you verify its claim against actual repo state. A SHA that doesn't
+     resolve means the stage didn't land — treat it as a fail and
+     re-dispatch; don't advance.
+   - **Spot-read the stage's diff** (`git show <sha>` / `git diff`)
+     against the bundle's digest — trust but verify, one level up.
+   - **Journal** the stage (commit SHAs, verify delta, notable
+     decisions); advance the cursor.
+   - **On `halt` (packaged decision):** surface it to the user via
+     `AskUserQuestion` (or `/askme` if several have queued) before any
+     replanning. The packaged decision is data; the asking is yours.
+   - **On `fail` after the 3-cycle budget: halt and report to the user**
+     with the accumulated failure + diagnosis digest. Never skip verify,
+     weaken the check, or edit the plan silently to make progress. When
+     halting, offer the user a concrete choice: *revert stage X*,
+     *replan stage Y*, or *adjust the verify* — don't just dump the
+     failure.
 
-4. **Between stages (orchestrator-only):** don't delegate this. Read the
-   journal's most recent entries, scan the cumulative diff if relevant,
+4. **Between stages (orchestrator-only):** don't delegate this — a
+   stage-runner sees one stage and can't reassess a cross-stage premise.
+   Read the journal's most recent entries, scan the cumulative diff if
+   relevant,
    and decide whether the next stage's premise still holds. Also
    reconcile the journal: every commit SHA the journal records should
    still resolve on HEAD (`git cat-file -e <sha>`) — if a commit got
@@ -299,16 +414,19 @@ Don't write code in this mode. Produce a structured plan. Step 6 governs what ha
    about what you checked is usually right.
 
 5. **Post-execution once-over.** Dispatch review sub-agents **in a single
-   message with multiple tool uses** so they run concurrently:
-   - `general-purpose` reviewer (always) — briefed to do a once-over
+   message with multiple tool uses** so they run concurrently. The two
+   reviewers are **siblings** you dispatch side-by-side — both leaves;
+   neither spawns the other:
+   - `general-purpose` reviewer (always; model per the model-selection policy) — briefed to do a once-over
      for bugs, unintended side effects, and regressions.
-   - A second `general-purpose` sub-agent following the `/codex-consult`
-     skill in **`review` mode** — for high-stakes work, if `command -v
-     codex` succeeds. Brief it to read
-     `~/.claude/skills/codex-consult/SKILL.md`, run with branch-range
-     scope (`<merge-base>...HEAD`), and return findings in the skill's
-     prescribed format. The skill encodes the diff-scope decisions and
-     CLI gotchas — don't restate them in the brief.
+   - The named `codex-runner` agent — for high-stakes work, if `command
+     -v codex` succeeds. Its def (`~/.claude/agents/codex-runner.md`)
+     carries the full runner contract (codex-consult's diff-scope
+     decisions and CLI gotchas, `review` mode, `JOB_ID` + sentinel
+     `exit=N` + verbatim findings) — don't restate the mechanics in the
+     brief; supply only the scope: branch-range (`<merge-base>...HEAD`).
+     If the type is unknown (stale registry), dispatch `general-purpose`
+     briefed to read and follow that file, pinned `model: sonnet` (Codex-driver; the def's pin doesn't transfer via prose).
 
    When Codex is available, dispatch **both** reviewers in one message —
    concurrent tool-uses on the same turn.
@@ -342,16 +460,21 @@ Don't write code in this mode. Produce a structured plan. Step 6 governs what ha
   the edit — do those inline and log to the journal.
 - **Parallel stages when safe.** Sequential stages are the default, but
   if two adjacent stages touch disjoint files *and* their verifies
-  don't depend on each other's output, dispatch both builders in a
+  don't depend on each other's output, dispatch both stage-runners in a
   single message (multiple `Agent` tool-use blocks) so they run
-  concurrently. Spot-check and commit them separately on pass — one
-  commit per stage keeps the journal readable. Parallelize only when
-  it's clearly safe; when in doubt, stay sequential. If any parallel
-  builder fails, serialize the retry — diagnose and re-dispatch each
-  independently rather than running parallel failure recovery.
+  concurrently. Remember each stage-runner fans out its own children —
+  two concurrent stages is more like four-to-six concurrent agents;
+  count the real number before adding a third. SHA-verify and journal
+  each returned bundle separately — one commit-set per stage keeps the
+  journal readable. Parallelize only when it's clearly safe; when in
+  doubt, stay sequential. If any parallel stage-runner fails, serialize
+  the retry — diagnose and re-dispatch each independently rather than
+  running parallel failure recovery.
 - Commit at natural breakpoints; don't batch. One commit per cohesive
   change — a stage might be one commit or two (e.g., a helper + its
-  wiring), but rarely more.
+  wiring), but rarely more. In execute mode this rule rides inside every
+  stage-runner's commit contract; you enforce it by spot-reading what
+  comes back.
 - Never skip or weaken a verify to make progress.
 - When the verify involves semantic judgment (does the fix match intent,
   is the refactor behavior-preserving, did the edit introduce regressions
@@ -360,8 +483,14 @@ Don't write code in this mode. Produce a structured plan. Step 6 governs what ha
   passes, type-check succeeds), one agent doing both build and verify is
   fine.
 - Never push or open a PR without explicit approval — the final report
-  hands back to the user for that.
+  hands back to the user for that. This gate carries down: every
+  stage-runner brief sets its push contract to NEVER, no exceptions —
+  delegation must never launder a push.
 - Blast-radius discipline before each commit: every writer, every
   consumer, parallel code paths, full function bodies, stale comments.
-- Always spot-read the diff before committing a sub-agent's work — trust
-  but verify.
+  The stage-runner does the committing, so this rides in its brief.
+- Trust but verify, recursively: the stage-runner spot-reads its
+  children's work against its local diff before committing; you
+  spot-read the returned stage diff and `git cat-file -e` every reported
+  SHA before journaling. Reports describe intent; the diff is truth — at
+  both levels.
