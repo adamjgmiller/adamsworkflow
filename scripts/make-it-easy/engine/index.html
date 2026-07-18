@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6EDDD" />
+  <meta name="theme-color" content="#15110D" />
+  <title>Make it easy</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23E8A04B'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23E8A04B' stroke-opacity='.35' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-reveal>
+  <!-- ambient lamplight that follows the active card -->
+  <div class="ambient" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wordmark">
+      <span class="lamp-glyph" aria-hidden="true"></span>
+      <span class="wordmark-text">make&nbsp;it&nbsp;easy</span>
+    </div>
+    <div class="topbar-right">
+      <button id="tourBtn" class="ghost-btn" type="button" hidden>
+        <span class="tour-ico" aria-hidden="true">▷</span> Play the tour
+      </button>
+      <div class="save-state" id="saveState" aria-live="polite" title="Your answers save automatically">
+        <span class="save-dot"></span><span id="saveLabel">Saved</span>
+      </div>
+      <div class="progress" aria-hidden="true">
+        <span id="progressNum" class="progress-num">00 / 00</span>
+        <span class="progress-track"><span id="progressFill" class="progress-fill"></span></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <nav class="rail" id="rail" aria-label="Decisions"></nav>
+
+    <section class="stage" id="stage" aria-live="polite">
+      <!-- cards injected here -->
+    </section>
+  </main>
+
+  <!-- single shared audio element -->
+  <audio id="player" preload="none"></audio>
+
+  <template id="cardTpl">
+    <article class="card" tabindex="-1">
+      <div class="card-glow" aria-hidden="true"></div>
+      <div class="card-inner">
+        <div class="card-head">
+          <p class="eyebrow"></p>
+          <button class="listen" type="button" hidden>
+            <span class="listen-ico" aria-hidden="true"></span>
+            <span class="listen-label">Listen</span>
+          </button>
+        </div>
+        <h1 class="title"></h1>
+        <p class="dek"></p>
+        <details class="detail" hidden>
+          <summary>More on this</summary>
+          <p class="detail-body"></p>
+        </details>
+        <figure class="visual" hidden></figure>
+        <div class="options" role="group"></div>
+        <div class="notes-wrap">
+          <label class="notes-label">Your note <span>optional</span></label>
+          <textarea class="notes" rows="2" placeholder="Add your own take, a constraint, an exception…"></textarea>
+        </div>
+        <button class="discuss-link" type="button" hidden>I'd rather talk this one through live →</button>
+        <div class="nav">
+          <button class="nav-back" type="button">‹ Back</button>
+          <button class="nav-next" type="button">Confirm <span aria-hidden="true">›</span></button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
