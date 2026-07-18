@@ -1,7 +1,16 @@
 # Guide-rebuild Phase 1 (generalize) — execution journal
 
 ## Cursor
-Current: S2+S3 — dispatched in parallel (S1 complete)
+Current: PHASE 1 COMPLETE (S1–S5 + once-over + fixes + trailer purge). Phase 2 next.
+
+## Phase-1 close (2026-07-18)
+- Fix batch committed (all 12 Codex + Claude findings; voice grep survivors =
+  attribution only). Journal committed. History rewritten (message-only) to strip
+  the 7 Claude-Session trailers; filter-branch backup ref deleted — SHAs cited in
+  earlier entries are pre-rewrite labels; final history = 17 commits, HEAD 1236da4.
+- FINAL GATE GREEN: tracked tree + all 17 commit messages, both layers.
+- Deferred to Adam (skill-manager handoff): codex-runner dispatch-mode contradiction.
+  Re-sync of shipped copies follows his skill-manager's report.
 
 ## Stage plan
 - S1 snapshot live config → scratchpad (NEVER committed) + fix-round delta report — opus
