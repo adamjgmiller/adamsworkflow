@@ -43,10 +43,17 @@ if [ "$state" = "attention" ]; then
   ntype=""
   msg=""
   transcript=""
+  jq_ok=0
   if command -v jq >/dev/null 2>&1 && [ -n "$payload" ]; then
     ntype=$(printf '%s' "$payload" | jq -r '.notification_type // .type // .subtype // empty' 2>/dev/null || printf '')
     msg=$(printf '%s' "$payload" | jq -r '.message // .text // empty' 2>/dev/null || printf '')
     transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' 2>/dev/null || printf '')
+    # jq present AND it extracted at least one field => parse succeeded. A
+    # payload that yields nothing (jq missing, malformed, or unexpected shape)
+    # counts as a parse failure and takes the no-jq fallback below.
+    if [ -n "$ntype" ] || [ -n "$msg" ] || [ -n "$transcript" ]; then
+      jq_ok=1
+    fi
   fi
 
   attention_worthy=0
@@ -89,6 +96,18 @@ if [ "$state" = "attention" ]; then
         "●"*) attention_worthy=1 ;;
       esac
     fi
+  fi
+
+  # No jq, or the payload didn't parse (jq_ok=0): we couldn't classify the
+  # notification at all, so rather than going dark we fall back to the legacy
+  # current-window heuristic (window already `●` ⇒ a tool is mid-flight and
+  # Claude is plausibly waiting) and still raise the attention marker. With jq
+  # present and parsed, jq_ok=1 and this is skipped — the jq path is unchanged.
+  if [ "$jq_ok" -eq 0 ] && [ "$attention_worthy" -eq 0 ]; then
+    current_name=$(tmux display-message -p -t "$TMUX_PANE" '#W' 2>/dev/null || printf '')
+    case "$current_name" in
+      "●"*) attention_worthy=1 ;;
+    esac
   fi
 
   if [ "$attention_worthy" -eq 0 ]; then

@@ -71,6 +71,8 @@ config compounds) is the guide's core claim and gets:
 
 ## 4. Repo tree (v2)
 
+_(Plan-time target. The shipped tree evolved: 14 commands, statusline deliberately not shipped, Pages assets land in a later phase — the root CLAUDE.md dependency matrix is ground truth.)_
+
 ```
 adamsworkflow/
 ├── README.md                  ← guide spine (§6 outline)
@@ -95,7 +97,8 @@ Cross-reference integrity (Phase 1 gate): shipped commands cite
 `~/.claude/docs/harness-notes.md §N` inline today → installer places
 `docs/field-notes.md` at `~/.claude/docs/field-notes.md` and shipped artifacts are
 rewritten to that path; a grep pass over every shipped artifact for `~/.claude/`
-paths verifies no dead pointers remain.
+paths verifies no dead pointers remain (the field notes ship in this repo as
+docs/field-notes.md; the original filename exists only on the author's machine).
 
 ## 5. Generalization & leakage
 

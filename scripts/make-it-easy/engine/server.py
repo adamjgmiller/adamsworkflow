@@ -22,6 +22,7 @@ STATE_DIR = os.path.join(ROOT, "state")
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
 SENTINEL = os.path.join(STATE_DIR, "SUBMITTED")
 PORT_FILE = os.path.join(STATE_DIR, "PORT")
+HOST_FILE = os.path.join(STATE_DIR, "HOST")  # display host, read back by `mie.py url`
 PORT = int(os.environ.get("PORT", "0"))  # 0 = OS assigns a free port (multi-instance safe)
 HOST = os.environ.get("MIE_HOST", "127.0.0.1")   # hostname/IP shown in the URL
 BIND = os.environ.get("MIE_BIND", HOST)          # interface to bind; defaults to HOST
@@ -155,6 +156,10 @@ def main():
     with open(tmp, "w") as f:
         f.write(str(actual))
     os.replace(tmp, PORT_FILE)
+    htmp = HOST_FILE + ".tmp"                         # publish the display host atomically
+    with open(htmp, "w") as f:                        # so `mie.py url` prints the serving host
+        f.write(host)
+    os.replace(htmp, HOST_FILE)
     print(f"PORT={actual}")
     print(f"URL=http://{host}:{actual}")
     print(f"make-it-easy serving on http://{host}:{actual}  (bind={BIND})")

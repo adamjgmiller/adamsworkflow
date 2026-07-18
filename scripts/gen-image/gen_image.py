@@ -17,6 +17,13 @@ shared venv from make-it-easy's mie.py (created on first use, flock-guarded).
 """
 import os, sys
 
+# Credentials gate FIRST — before any dependency bootstrap. A keyless run must
+# exit with the documented message without touching the network or pip (no venv
+# build, no install), so it works offline and fails fast with a clear reason.
+if not os.environ.get("GOOGLE_CLOUD_PROJECT") and not os.environ.get("GEMINI_API_KEY"):
+    sys.exit("gen-image: no credentials — set GOOGLE_CLOUD_PROJECT (Vertex) "
+             "or GEMINI_API_KEY (Gemini Developer API).")
+
 try:
     from google import genai
     from google.genai import types
@@ -24,7 +31,8 @@ except ImportError:
     if os.environ.get("GEN_IMAGE_BOOTSTRAP"):
         sys.exit("gen-image: google-genai missing even in the shared venv")
     import subprocess
-    mie = os.path.expanduser("~/.claude/scripts/make-it-easy/mie.py")
+    claude_home = os.environ.get("CLAUDE_HOME", os.path.expanduser("~/.claude"))
+    mie = os.path.join(claude_home, "scripts", "make-it-easy", "mie.py")
     venv_py = subprocess.check_output(
         [sys.executable, mie, "env"], text=True).strip().splitlines()[-1]
     os.environ["GEN_IMAGE_BOOTSTRAP"] = "1"

@@ -17,9 +17,10 @@
 #
 # Layer 1 — committed generic patterns (safe to publish): shapes that are
 #   almost never legitimate in this repo — routable IPv4 literals, real email
-#   addresses, tailnet hostnames, absolute home paths, credential shapes, and
-#   bare single-label host URLs. Documentation/loopback placeholders are
-#   excluded so the gate stays green on legitimate mentions.
+#   addresses, tailnet hostnames, absolute home paths, credential shapes, bare
+#   single-label host URLs, and Claude Code commit-provenance strings (the
+#   local-commit trailer key + session-URL stem). Documentation/loopback
+#   placeholders are excluded so the gate stays green on legitimate mentions.
 #
 # Layer 2 — a private term list kept OUTSIDE the repo at
 #   $HOME/.config/adamsworkflow/leakage-terms.txt (never committed). If that
@@ -86,7 +87,17 @@ CRED_EXCL=''
 URL_RE='http://[a-z0-9-]+:[0-9]+'
 URL_EXCL='^http://localhost:'
 
-CATS='IPV4 EMAIL TSNET HOMEPATH CRED URL'
+# Claude Code commit-provenance strings that must never reach a published file:
+# the local-commit trailer key and the session-URL stem the harness stamps into
+# commits. Both are written with [] character classes so this gate does not
+# match its own source (the raw literals never appear contiguously here).
+CSESSION_RE='Claude-Session[:]'
+CSESSION_EXCL=''
+
+CSESSURL_RE='claude[.]ai/code/session_'
+CSESSURL_EXCL=''
+
+CATS='IPV4 EMAIL TSNET HOMEPATH CRED URL CSESSION CSESSURL'
 
 # scan_text_stream <category> <regex> <exclusion-regex> <source-label>
 # reads name:line:content? no — we feed pre-located matches. See callers.
@@ -148,7 +159,7 @@ scan_messages() {
     done
     # Layer-2 terms in messages
     if [ -f "$TERMS_FILE" ]; then
-      while IFS= read -r term; do
+      while IFS= read -r term || [[ -n "$term" ]]; do
         case "$term" in ''|\#*) continue ;; esac
         while IFS= read -r hit; do
           [ -n "$hit" ] || continue
@@ -163,7 +174,7 @@ scan_messages() {
 scan_terms_tracked() {
   [ -f "$TERMS_FILE" ] || { echo "[check-leakage] note: no private term file at $TERMS_FILE; Layer 2 skipped" >&2; return 0; }
   local term
-  while IFS= read -r term; do
+  while IFS= read -r term || [[ -n "$term" ]]; do
     case "$term" in ''|\#*) continue ;; esac
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue

@@ -13,7 +13,7 @@ devbox chapter, flagship visual on GitHub Pages, named-but-fair landscape sectio
 
 **Planning docs** (session scratchpad, will be committed here as sidecars when build
 starts): plan-v2.md (the approved plan + two answer-round amendments), plan-critique.md
-(Fable adversarial review, 14 findings), research-findings.md (245-agent verified
+(Fable adversarial review, 14 findings), research-findings.md (verified
 landscape research), system-map.md (live-config recon).
 Scratchpad: <session-scratchpad>/
 

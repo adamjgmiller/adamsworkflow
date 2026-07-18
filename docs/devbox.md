@@ -147,10 +147,10 @@ project list. Naming windows after the project (not `bash`, `bash`,
 `bash`) means the status bar tells you what's where at a glance.
 
 **Two indicators on the status bar, wired to Claude Code hooks.** This
-repo ships tmux config for both:
+repo ships the indicator scripts and a Claude Code hooks snippet for both:
 
-- **A window activity indicator** — flags a window when its session has
-  produced output since you last looked at it.
+- **A window activity indicator** — marks a window that has active tool
+  work in flight: set when a tool starts, cleared when the session stops.
 - **A "Claude is waiting on a question" indicator** — wired to Claude
   Code hooks, so when an agent pauses to ask you something, the window
   marks itself. A glance at the status bar tells you which project needs
@@ -230,6 +230,6 @@ Honest limits:
   means "your responsibility." Budget a little ongoing attention for it.
 - **This is a setup, not a script.** I'm describing an architecture and
   the habits around it, not handing you a one-command installer. The
-  tmux indicator config ships in this repo; the rest is standard tools
-  (Tailscale, mosh, tmux, your terminal) that you install and wire
-  together yourself.
+  tmux indicator scripts and a Claude Code hooks snippet ship in this
+  repo; the rest is standard tools (Tailscale, mosh, tmux, your
+  terminal) that you install and wire together yourself.

@@ -17,18 +17,22 @@ Everything for a run (spec, assets, state, SUBMITTED) lives inside its own run d
 """
 import os, sys, time, secrets, shutil, subprocess, fcntl, re, json
 
-HOME = os.path.expanduser("~")
-BASE = os.path.join(HOME, ".claude", "make-it-easy")
+# ~/.claude root (override with CLAUDE_HOME for sandboxed / relocated installs).
+CLAUDE_HOME = os.environ.get("CLAUDE_HOME", os.path.expanduser("~/.claude"))
+BASE = os.path.join(CLAUDE_HOME, "make-it-easy")          # runtime data: runs/, .venv
 RUNS = os.path.join(BASE, "runs")
-SCRIPTS = os.path.join(HOME, ".claude", "scripts", "make-it-easy")
+# mie.py, engine/, and media_gen.py ship together in one folder — derive their
+# paths from __file__ so a relocated / sandboxed install finds its own siblings.
+SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.join(SCRIPTS, "engine")
 MEDIA = os.path.join(SCRIPTS, "media_gen.py")
 VENV = os.path.join(BASE, ".venv")
 VENV_PY = os.path.join(VENV, "bin", "python")
-# Display host for the printed URL. Defaults to localhost-only. To reach pages
-# from other devices, set MIE_HOST to a private tailnet/VPN hostname or IP (see
-# the README's serving section) — and set MIE_BIND to match on the server side.
-HOST = os.environ.get("MIE_HOST", "127.0.0.1")
+# The display host for the printed URL is read from the server-published
+# state/HOST at url-time (see cmd_url), with MIE_HOST as the env fallback and
+# 127.0.0.1 (localhost-only) as the final default. To reach pages from other
+# devices, set MIE_HOST to a private tailnet/VPN hostname or IP (see the
+# README's serving section) — and set MIE_BIND to match on the server side.
 
 
 def slugify(s):
@@ -60,18 +64,33 @@ def cmd_env():
 
 
 def cmd_media(run, force=False):
+    # Keyless path: with no Google credentials, media_gen prints its text-only
+    # skip and exits 0 without touching the network. Run it on the SYSTEM python
+    # so we never build the venv or pip-install just to skip — the run still
+    # succeeds fully offline. media_gen imports google-genai lazily (its import
+    # is guarded), so the skip path needs no package installed.
+    if not os.environ.get("GOOGLE_CLOUD_PROJECT") and not os.environ.get("GEMINI_API_KEY"):
+        subprocess.check_call([sys.executable, MEDIA, os.path.abspath(run)]
+                              + (["--force"] if force else []))
+        return
     py = cmd_env()
     subprocess.check_call([py, MEDIA, os.path.abspath(run)] + (["--force"] if force else []))
 
 
 def cmd_url(run, timeout=30):
     pf = os.path.join(run, "state", "PORT")
+    hf = os.path.join(run, "state", "HOST")
     t0 = time.time()
     while time.time() - t0 < float(timeout):
         if os.path.exists(pf):
             port = open(pf).read().strip()
             if port:
-                print(f"http://{HOST}:{port}")
+                # Prefer the display host the server actually published; fall
+                # back to the env override, then localhost — so the printed URL
+                # matches the host the page is being served on.
+                host = open(hf).read().strip() if os.path.exists(hf) else ""
+                host = host or os.environ.get("MIE_HOST", "127.0.0.1")
+                print(f"http://{host}:{port}")
                 return
         time.sleep(0.3)
     sys.exit("timed out waiting for server PORT")

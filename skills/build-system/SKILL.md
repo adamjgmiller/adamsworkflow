@@ -1,6 +1,6 @@
 ---
 name: build-system
-description: Adam's end-to-end build pipeline — docs sized to the work (PRD + Plan for
+description: The end-to-end build pipeline — docs sized to the work (PRD + Plan for
   large/ambiguous, a single Spec for medium, neither for small) → Build → Draft PR →
   Final Review, autonomous by default, with adversarial Codex + sub-agent review loops at
   each gate. Use inside a repo for any meaningful feature or change request that warrants

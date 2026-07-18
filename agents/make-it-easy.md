@@ -73,7 +73,7 @@ The engine (server, persistence, audio player, rail navigation, mobile layout, t
 }
 ```
 
-## Rules (from Adam, hold these)
+## Rules (from the config owner, hold these)
 
 - **Curate hard**, but always offer expandable `detail` for the heavy underlying content (prompt diffs, long configs) — description on the surface, full thing one click away.
 - **One decision per card**, recommendation first (`recommended: true`), the trade-off in each option's `desc` — this is the grill-me method, rendered.

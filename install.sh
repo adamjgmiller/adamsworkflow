@@ -59,11 +59,13 @@ for d in "${WALK_DIRS[@]}"; do
 done
 
 say() { echo "[install] $*"; }
+# do_cmd <argv...> — run a command directly (no eval, no re-splitting of args).
+# Dry-run prints the argv %q-quoted so it stays copy-pasteable and unambiguous.
 do_cmd() {
   if (( DRY_RUN )); then
-    echo "  DRY-RUN: $*"
+    printf '  DRY-RUN:'; printf ' %q' "$@"; printf '\n'
   else
-    eval "$@"
+    "$@"
   fi
 }
 
@@ -76,7 +78,7 @@ install_one() {
   local dest_parent
   dest_parent="$(dirname "$dest")"
 
-  do_cmd "mkdir -p \"$dest_parent\""
+  do_cmd mkdir -p "$dest_parent"
 
   if [[ -L "$dest" ]]; then
     local link_target
@@ -86,18 +88,18 @@ install_one() {
       return 0
     fi
     say "  backup $rel (existing symlink -> $link_target)"
-    do_cmd "mv \"$dest\" \"$dest.bak-$STAMP\""
+    do_cmd mv "$dest" "$dest.bak-$STAMP"
   elif [[ -e "$dest" ]]; then
     say "  backup $rel (existing file -> $dest.bak-$STAMP)"
-    do_cmd "mv \"$dest\" \"$dest.bak-$STAMP\""
+    do_cmd mv "$dest" "$dest.bak-$STAMP"
   fi
 
   if [[ "$MODE" == "symlink" ]]; then
     say "  link  $rel"
-    do_cmd "ln -s \"$src\" \"$dest\""
+    do_cmd ln -s "$src" "$dest"
   else
     say "  copy  $rel"
-    do_cmd "cp \"$src\" \"$dest\""
+    do_cmd cp "$src" "$dest"
   fi
 }
 
@@ -140,7 +142,8 @@ say "Target:  $TARGET_DIR"
 say ""
 
 # Walk every regular file under the config directories, preserving structure.
-# Prune gitignored build junk and the repo-only leakage gate.
+# Prune gitignored build junk, .gitignore files themselves, and the repo-only
+# leakage gate.
 while IFS= read -r -d '' f; do
   rel="${f#$REPO_DIR/}"
   install_one "$rel"
@@ -149,6 +152,7 @@ done < <(find "${WALK_DIRS[@]/#/$REPO_DIR/}" \
               ! -name '*.pyc' \
               ! -path '*/__pycache__/*' \
               ! -name '*.bak-*' \
+              ! -name '.gitignore' \
               ! -path "$REPO_DIR/scripts/check-leakage.sh" \
               -print0)
 

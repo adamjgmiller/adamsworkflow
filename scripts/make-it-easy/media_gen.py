@@ -18,7 +18,7 @@ Credentials (bring your own key):
   - neither set           -> audio/image generation is skipped with a notice and
                              the run still succeeds; the page builds text-only.
 """
-import os, sys, json, wave
+import os, sys, json, wave, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Imported lazily so the "no credentials -> skip" path works even when the
@@ -36,6 +36,32 @@ FORCE = "--force" in sys.argv
 RUN = os.path.abspath(ARGS[0]) if ARGS else os.getcwd()
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# ---------------------------------------------------------------------------
+# Path-escape guards. Card ids and visual.src come from a spec.json we treat as
+# untrusted; both feed into on-disk output paths. Ids must be kebab-case, and
+# every resolved output path must live inside RUN — so a crafted id or src
+# (e.g. "../../etc/x") can never write outside the run dir.
+# ---------------------------------------------------------------------------
+_KEBAB = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def _kebab_id(cid):
+    """Validate a card id as kebab-case; reject anything that could escape a path."""
+    if not isinstance(cid, str) or not _KEBAB.match(cid):
+        sys.exit(f"media_gen: card id {cid!r} is not kebab-case (lowercase "
+                 f"letters/digits/hyphens only) — refusing to build a path from it.")
+    return cid
+
+
+def _inside_run(path):
+    """Resolve `path` and require it to live inside RUN (blocks ../ escapes)."""
+    real = os.path.realpath(path)
+    run_real = os.path.realpath(RUN)
+    if os.path.commonpath([real, run_real]) != run_real:
+        sys.exit(f"media_gen: refusing to write outside the run dir: {path!r} "
+                 f"resolves to {real!r} (run: {run_real!r}).")
+    return real
 
 
 def _client(location):
@@ -68,7 +94,7 @@ def gen_audio(card, voice):
     cid, text = card["id"], card.get("narration")
     if not text:
         return cid, "audio: none"
-    out = os.path.join(RUN, "assets", "audio", f"{cid}.wav")
+    out = _inside_run(os.path.join(RUN, "assets", "audio", f"{cid}.wav"))
     if os.path.exists(out) and not FORCE:
         return cid, "audio: skip"
     client = _client(TTS_LOC)
@@ -92,7 +118,7 @@ def gen_image(card):
     if v.get("type") != "image" or not v.get("prompt"):
         return None
     src = v.get("src") or f"assets/img/{card['id']}.png"
-    out = os.path.join(RUN, src)
+    out = _inside_run(os.path.join(RUN, src))
     if os.path.exists(out) and not FORCE:
         return f"{card['id']} image: skip"
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -128,6 +154,8 @@ def main():
         sys.exit(f"media_gen: no spec.json in run dir: {RUN}")
     spec = json.load(open(os.path.join(RUN, "spec.json")))
     cards = spec.get("cards", [])
+    for c in cards:                          # validate every id up front (path safety)
+        _kebab_id(c.get("id", ""))
     voice = spec.get("voice", VOICE_DEFAULT)
     os.makedirs(os.path.join(RUN, "assets", "audio"), exist_ok=True)
 
