@@ -1,7 +1,27 @@
 # Guide-rebuild Phase 1 (generalize) — execution journal
 
 ## Cursor
-Current: PHASE 1 COMPLETE (S1–S5 + once-over + fixes + trailer purge). Phase 2 next.
+Current: ALL OVERNIGHT PHASES COMPLETE — awaiting Adam's morning gates (skill-manager
+report → re-sync; README+visual read; deferred judgment items) before promote/merge.
+
+## Phase 5 close + endgame (2026-07-18)
+- review-fix-loop(/lens-review) CONVERGED: 3 rounds + addendum, 4 fix commits
+  (round-1 batch; installer symlink-alias HIGH; installer ..-bypass HIGH + gate
+  hyphen; cd -P addendum). Round-1 recovery: flattened a stalled double-nested
+  fan-out; round-1 report authoritative. Guard exotic residuals accepted as
+  documented limitation (conductor decision, Option A — noted for Adam).
+- Conductor endgame: guard-limitation comment + PLAN filename reword (a49867f
+  pre-rewrite); the bot-project L2 term narrowed to the personal skill's exact
+  name (the public project citation in RESEARCH is legitimate); final history
+  rewrite (31 commits: the preview host-port literal's blob span purged via
+  tree-filter; two message bodies reworded); backup ref deleted.
+- FULL GATE GREEN: tree + messages + ALL historical blobs (history-aware scan).
+- Deferred to Adam (morning): codex-runner #16 + pr-auto-review #31 semantics
+  (skill-manager), devbox DRAFT banner #25, design-sample fate #21, residual
+  internal names in plans/ #17, field-notes §9 staleness #26, installer-guard
+  dependency question (recommended: keep as documented limitation).
+- Next: push branch + open DRAFT PR (plan-approved); Greptile trigger held for
+  pr-auto-review; merge gated on Adam's read.
 
 ## Phase-1 close (2026-07-18)
 - Fix batch committed (all 12 Codex + Claude findings; voice grep survivors =
