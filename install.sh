@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# install.sh — mirror this repo's commands/ and skills/ into ~/.claude/
+# install.sh — mirror this repo's Claude Code config into ~/.claude/
+#
+# Installs: commands/ skills/ agents/ workflows/ scripts/ and docs/field-notes.md
+# (the harness field notes the commands cite at ~/.claude/docs/field-notes.md).
+# Skipped on purpose: README.md, CLAUDE.md, CLAUDE-global.md, docs/devbox.md,
+# docs/design-sample.html (reference docs you merge into your own config by
+# choice), and scripts/check-leakage.sh (a repo-maintenance tool, not config).
 #
 # Usage:
 #   ./install.sh --symlink     # symlink each file (git pull updates live config)
@@ -10,8 +16,9 @@
 # Conflict handling:
 #   If a target file already exists, it's backed up to <file>.bak-<timestamp>
 #   before being replaced. Existing symlinks pointing into this same repo are
-#   left alone (idempotent re-runs are a no-op).
-#
+#   left alone (idempotent re-runs are a no-op). After installing, stale v1
+#   symlinks (links into this clone whose source file no longer exists) are
+#   removed — see the README's migration section.
 set -euo pipefail
 
 MODE=""
@@ -21,7 +28,7 @@ TARGET_DIR="${CLAUDE_HOME:-$HOME/.claude}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 usage() {
-  sed -n '2,14p' "$0"
+  sed -n '2,21p' "$0"
   exit "${1:-0}"
 }
 
@@ -42,10 +49,14 @@ if [[ -z "$MODE" ]]; then
   usage 1
 fi
 
-if [[ ! -d "$REPO_DIR/commands" || ! -d "$REPO_DIR/skills" ]]; then
-  echo "Error: expected commands/ and skills/ next to install.sh (got: $REPO_DIR)" >&2
-  exit 1
-fi
+# Directories walked in full. check-leakage.sh is pruned from scripts/ below.
+WALK_DIRS=(commands skills agents workflows scripts)
+for d in "${WALK_DIRS[@]}"; do
+  if [[ ! -d "$REPO_DIR/$d" ]]; then
+    echo "Error: expected $d/ next to install.sh (got: $REPO_DIR)" >&2
+    exit 1
+  fi
+done
 
 say() { echo "[install] $*"; }
 do_cmd() {
@@ -90,16 +101,65 @@ install_one() {
   fi
 }
 
+# v1-migration: after installing, drop stale v1 symlinks under commands/ and
+# skills/ — links that point INTO this clone but whose source file no longer
+# exists (renamed/removed between v1 and v2). Regular files and symlinks
+# pointing anywhere else are never touched.
+migrate_v1() {
+  local removed=0 base dir link tgt
+  for base in commands skills; do
+    dir="$TARGET_DIR/$base"
+    [[ -d "$dir" ]] || continue
+    while IFS= read -r -d '' link; do
+      tgt="$(readlink "$link")"
+      case "$tgt" in
+        "$REPO_DIR"/*)
+          if [[ ! -e "$tgt" ]]; then
+            if (( DRY_RUN )); then
+              echo "migrated: (dry-run) would remove stale v1 link $link"
+            else
+              rm "$link"
+              echo "migrated: removed stale v1 link $link"
+            fi
+            removed=1
+          fi
+          ;;
+      esac
+    done < <(find "$dir" -type l -print0 2>/dev/null)
+  done
+  if (( removed )); then
+    say ""
+    say "Removed stale v1 symlink(s) above (source renamed/removed since v1)."
+    say "See the README's migration section for the v1 -> v2 renames."
+  fi
+}
+
 say "Mode:    $MODE${DRY_RUN:+ (dry-run)}"
 say "Source:  $REPO_DIR"
 say "Target:  $TARGET_DIR"
 say ""
 
-# Walk every regular file under commands/ and skills/, preserving structure.
+# Walk every regular file under the config directories, preserving structure.
+# Prune gitignored build junk and the repo-only leakage gate.
 while IFS= read -r -d '' f; do
   rel="${f#$REPO_DIR/}"
   install_one "$rel"
-done < <(find "$REPO_DIR/commands" "$REPO_DIR/skills" -type f -print0)
+done < <(find "${WALK_DIRS[@]/#/$REPO_DIR/}" \
+              -type f \
+              ! -name '*.pyc' \
+              ! -path '*/__pycache__/*' \
+              ! -name '*.bak-*' \
+              ! -path "$REPO_DIR/scripts/check-leakage.sh" \
+              -print0)
+
+# The harness field notes the commands cite by path.
+if [[ -f "$REPO_DIR/docs/field-notes.md" ]]; then
+  install_one docs/field-notes.md
+else
+  say "  warn  docs/field-notes.md not found — skipped (commands cite it at ~/.claude/docs/)"
+fi
+
+migrate_v1
 
 say ""
 say "Done. Backups (if any) end in .bak-$STAMP."
