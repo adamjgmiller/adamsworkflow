@@ -83,6 +83,17 @@ Current: S2+S3 — dispatched in parallel (S1 complete)
   make-it-easy/visual-builder; nits: installed .gitignore, research stats telemetry,
   stale harness-notes pointer in PLAN, migrate_v1 breadth) held for synthesis with
   Codex's report.
+- 2026-07-18 Codex reviewer: 13 findings (JOB verified, exit=0). Synthesis: 12 fixed
+  + Claude's M2/nits in one delegated batch (installer eval→argv; gate gains
+  session-URL patterns + unterminated-line fix; voice de-personalization; keyless
+  paths run before dependency bootstrap; media path-escape guard; no-jq attention
+  fallback; devbox.md accuracy; PLAN/RESEARCH annotations + telemetry trim;
+  CLAUDE_HOME-aware script paths; state/HOST persistence). Session-URL trailer purge
+  (Codex #1, high) = conductor history rewrite after the fix commit — SHAs cited in
+  earlier entries become pre-normalization labels at that point. DEFERRED to Adam:
+  Codex #10 — codex-runner "foreground-only" description vs async-collect contract
+  contradiction, present in the live config too; not our call to resolve in the
+  shipped copy. migrate_v1 breadth accepted as-is (v1 installed only commands+skills).
 
 ## Stage S3 — scripts & engines
 - 2026-07-18 dispatched stage-runner (opus)
