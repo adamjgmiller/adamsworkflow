@@ -64,13 +64,13 @@ fi
 # would alias source and destination and damage the clone. For a not-yet-created
 # target, resolve its deepest existing ancestor physically and re-append the
 # missing tail (also catches a target reached through a symlinked ancestor).
-if ! target_abs="$(cd "$TARGET_DIR" 2>/dev/null && pwd -P)"; then
+if ! target_abs="$(CDPATH= cd -P "$TARGET_DIR" 2>/dev/null && pwd -P)"; then
   _t="$TARGET_DIR"; case "$_t" in /*) ;; *) _t="$PWD/$_t" ;; esac
   _tail=""
   while [[ ! -d "$_t" && "$_t" != "/" && "$_t" != "." ]]; do
     _tail="/$(basename "$_t")$_tail"; _t="$(dirname "$_t")"
   done
-  target_abs="$( (cd "$_t" 2>/dev/null && pwd -P) || printf '%s' "$_t" )$_tail"
+  target_abs="$( (CDPATH= cd -P "$_t" 2>/dev/null && pwd -P) || printf '%s' "$_t" )$_tail"
 fi
 # Lexically collapse any . and .. segments so a path like
 # <parent>/missing/../<repo> can't dodge the guard below by its string form.
