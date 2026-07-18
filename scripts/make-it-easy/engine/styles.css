@@ -154,6 +154,7 @@ body {
   box-shadow: 0 0 8px var(--relief); transition: background .3s, box-shadow .3s;
 }
 .save-state.saving .save-dot { background: var(--lamp); box-shadow: 0 0 8px var(--lamp); }
+.save-state.unsaved .save-dot { background: #d98324; box-shadow: none; }
 
 .progress { display: flex; align-items: center; gap: 10px; }
 .progress-num { font-family: var(--mono); font-size: .74rem; color: var(--muted); letter-spacing: .06em; }

@@ -126,11 +126,12 @@ TSNET_RE='[a-z0-9-]+\.ts\.net'
 TSNET_EXCL=''
 
 # Absolute home paths: Linux /home/<name>, macOS /Users/<name>, and the root
-# account's home directory. The last alternative requires a trailing word
-# boundary (so /rootfs and /rootkit do NOT match) to avoid flagging legitimate
-# doc paths. The root literal is written with a [] class (like CSESSION below)
-# so this gate does not flag its own source.
-HOMEPATH_RE='/home/[a-z0-9_]+|/Users/[A-Za-z0-9_]+|[/]root\b'
+# account's home directory. The root alternative requires a trailing slash + a
+# path character (written with a [] class, like CSESSION below, so this gate
+# does not flag its own source, and this comment avoids the literal form), so a
+# real root-home path leak matches while bare "/root" prose (docs, commit
+# messages) and /rootfs, /rootkit do NOT.
+HOMEPATH_RE='/home/[a-z0-9_]+|/Users/[A-Za-z0-9_]+|[/]root/[A-Za-z0-9._]'
 HOMEPATH_EXCL='^(/home/user|/Users/user)$'
 
 CRED_RE='AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'

@@ -326,7 +326,10 @@
       });
       if (!r.ok) throw new Error("HTTP " + r.status);
     } catch (e) {
-      flagUnsaved();
+      // submit failure is NOT an autosave retry — show a distinct "not sent"
+      // state (the button below is the retry affordance), not "retrying".
+      const el = $("#saveState"); el.classList.remove("saving"); el.classList.add("unsaved");
+      $("#saveLabel").textContent = "Not sent — tap to retry";
       const nb = $(".nav-next", stage);
       if (nb && nb.firstChild) nb.firstChild.textContent = "Couldn't send — tap to retry ";
       return;   // leave the card in place; the button re-runs submit() on the next tap

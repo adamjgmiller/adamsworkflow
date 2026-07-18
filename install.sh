@@ -26,7 +26,7 @@ set -euo pipefail
 
 MODE=""
 DRY_RUN=0
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # CLAUDE_HOME only controls where THIS installer writes files; Claude Code
 # itself reads config from ~/.claude unless you also set CLAUDE_CONFIG_DIR to
 # the same path, so relocating with CLAUDE_HOME alone installs where Claude
@@ -58,14 +58,19 @@ fi
 
 # Refuse to install into the source repo or any directory inside it: the find
 # walk below streams, so a target under the repo would recurse over files we
-# just installed, and target == repo would overwrite the sources. REPO_DIR is
-# already canonical (cd+pwd); canonicalize the target the same way when it
-# already exists, else fall back to an absolute form.
-if ! target_abs="$(cd "$TARGET_DIR" 2>/dev/null && pwd)"; then
-  case "$TARGET_DIR" in
-    /*) target_abs="$TARGET_DIR" ;;
-    *)  target_abs="$PWD/$TARGET_DIR" ;;
-  esac
+# just installed, and target == repo would overwrite the sources. Compare
+# PHYSICAL paths (pwd -P resolves symlinks), so a ~/.claude symlinked into this
+# repo is caught even though its logical path differs — otherwise --symlink mode
+# would alias source and destination and damage the clone. For a not-yet-created
+# target, resolve its deepest existing ancestor physically and re-append the
+# missing tail (also catches a target reached through a symlinked ancestor).
+if ! target_abs="$(cd "$TARGET_DIR" 2>/dev/null && pwd -P)"; then
+  _t="$TARGET_DIR"; case "$_t" in /*) ;; *) _t="$PWD/$_t" ;; esac
+  _tail=""
+  while [[ ! -d "$_t" && "$_t" != "/" && "$_t" != "." ]]; do
+    _tail="/$(basename "$_t")$_tail"; _t="$(dirname "$_t")"
+  done
+  target_abs="$( (cd "$_t" 2>/dev/null && pwd -P) || printf '%s' "$_t" )$_tail"
 fi
 if [[ "$target_abs" == "$REPO_DIR" || "$target_abs" == "$REPO_DIR"/* ]]; then
   echo "Error: target ($target_abs) is the source repo or a directory inside it." >&2
@@ -99,7 +104,7 @@ do_cmd() {
 # neither run clobbers the other's backup.
 backup_path() {
   local candidate="$1.bak-$STAMP" n=1
-  while [[ -e "$candidate" ]]; do
+  while [[ -e "$candidate" || -L "$candidate" ]]; do
     candidate="$1.bak-$STAMP.$n"
     n=$((n + 1))
   done

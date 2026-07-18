@@ -52,7 +52,7 @@ Prerequisites, in one table:
 | git | assumed everywhere — reviews scope themselves with a diff (`/quick-review` needs nothing else) |
 | `gh` | `/ship-issues`, `/pr-auto-review`, `/auto-merge-main`, build-system's PR phases |
 | Codex CLI | OpenAI's CLI, on its own account. Optional everywhere except the `codex-consult` skill itself: every review vehicle preflights `command -v codex` and, when it is absent, degrades by design to a labeled single-source review |
-| Google credentials | `gen-image`, and media on make-it-easy pages. Either route: Vertex (`GOOGLE_CLOUD_PROJECT` + the Vertex AI API enabled + ADC/service-account creds) or `GEMINI_API_KEY`. Without them, make-it-easy builds a text-only page while gen-image exits with a message naming the keys to set |
+| Google credentials | `gen-image`, and media on make-it-easy pages. Either route: Vertex (`GOOGLE_CLOUD_PROJECT` + the Vertex AI API enabled + ADC/service-account creds) or `GEMINI_API_KEY`. Without them, make-it-easy builds a text-only page while gen-image exits with a message naming the credentials to set |
 | python3 | the page-serving engines |
 | tmux | the activity indicators |
 | `frontend-design` plugin | named by `guided-tour` (click-through code tours), `teamwork`, and `visual` as a quality bar; all three run without it |

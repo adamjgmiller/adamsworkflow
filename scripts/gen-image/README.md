@@ -25,7 +25,8 @@ isn't already importable, so it runs from any Python.
 
 Set **one** of:
 
-- `GOOGLE_CLOUD_PROJECT` — Google Vertex AI. This is the tested path.
+- `GOOGLE_CLOUD_PROJECT` — Google Vertex AI (also needs the Vertex AI API
+  enabled and ADC / service-account credentials). This is the tested path.
 - `GEMINI_API_KEY` — the Gemini Developer API (alternative; model and region
   availability may differ from Vertex).
 

@@ -50,7 +50,7 @@ The engine (server, persistence, audio player, rail navigation, mobile layout, t
     { "id": "stable-kebab-id",
       "eyebrow": "Decision 01 · Topic",
       "title": "The question, as a short editorial headline",
-      "dek": "1–2 sentence why-this-matters. Use <strong> sparingly.",
+      "dek": "1–2 sentence why-this-matters (plain text — rendered as text, no markup).",
       "detail": [ "optional deeper prose",
                   { "text": "label for a code block", "code": "full prompt / diff text", "codeLabel": "New prompt" } ],
       "detailSummary": "Show the full prompt",          // optional; default "More on this"

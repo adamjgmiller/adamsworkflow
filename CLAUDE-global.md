@@ -21,7 +21,7 @@ For a meaningful change in a repo — more than a quick edit — run the Build S
 - Trivial edit / pure Q&A → just do it inline.
 - Staged execution of a plan — one exists or you'll write one; no docs/PR ceremony needed → `/orchestrate`.
 - Meaningful repo change from a raw request → `/build-system` (owns docs → build → PR; see its tiering).
-- GitHub issues to resolve, or an existing PR to review/ship → `/ship-issues` (PR review only: `/pr-auto-review`; PR behind main: `/auto-merge-main`).
+- GitHub issues to resolve, or an existing PR to review/ship → `/ship-issues` (PR-stage review + fix + promote: `/pr-auto-review`; PR behind main: `/auto-merge-main`).
 - Non-code or mixed deliverable (research, proposal, brand, docs) wanting a bespoke team + judge → `/teamwork`.
 - Long unattended goal that must not stop for questions → `/auto-run <goal + methodology>`.
 - Batch decisions/questions for me → `/make-it-easy` (walkthrough page) or `/askme` (inline); stress-test a plan with me → `/grill-me`.
