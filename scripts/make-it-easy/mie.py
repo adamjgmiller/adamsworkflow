@@ -44,7 +44,8 @@ def cmd_init(slug):
     os.makedirs(RUNS, exist_ok=True)
     rid = f"{int(time.time())}-{secrets.token_hex(3)}-{slugify(slug)}"
     run = os.path.join(RUNS, rid)
-    shutil.copytree(ENGINE, run)                       # rid is unique -> dest never pre-exists
+    shutil.copytree(ENGINE, run,                       # rid is unique -> dest never pre-exists
+                    ignore=shutil.ignore_patterns("*.bak-*", "__pycache__", "*.pyc"))
     for d in ("assets/audio", "assets/diagrams", "assets/img", "state"):
         os.makedirs(os.path.join(run, d), exist_ok=True)
     print(run)

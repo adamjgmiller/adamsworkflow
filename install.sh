@@ -136,7 +136,8 @@ migrate_v1() {
   fi
 }
 
-say "Mode:    $MODE${DRY_RUN:+ (dry-run)}"
+dry_label=""; (( DRY_RUN )) && dry_label=" (dry-run)"
+say "Mode:    $MODE$dry_label"
 say "Source:  $REPO_DIR"
 say "Target:  $TARGET_DIR"
 say ""
