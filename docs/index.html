@@ -949,10 +949,15 @@ footer { margin-top: clamp(56px, 8vw, 96px); }
               <text x="614" y="264" font-size="14.5"><tspan class="d-accent-f">/</tspan><tspan class="d-ink">pr-auto-review</tspan></text>
               <text class="d-faint" x="614" y="282" font-size="10.5">PR-stage review + fix + promote</text>
 
-              <!-- funnel to review engine -->
+              <!-- build-system · ship-issues · pr-auto-review funnel into the loop -->
               <path class="d-arrow" d="M588 314 V352" stroke-width="1.3" vector-effect="non-scaling-stroke"/>
               <path class="d-arrow" d="M583 347 L588 354 L593 347" stroke-width="1.3" fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-              <text class="d-faint" x="606" y="338" font-size="10.5" text-anchor="start">all review through ↓</text>
+
+              <!-- /orchestrate branches out: one post-execution once-over, not the loop -->
+              <path class="d-arrow" d="M900 204 H922 V337 H907" stroke-width="1.3" fill="none" vector-effect="non-scaling-stroke"/>
+              <path class="d-arrow" d="M912 332 L905 337 L912 342" stroke-width="1.3" fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+              <rect class="d-box" x="700" y="320" width="204" height="34" rx="5" vector-effect="non-scaling-stroke"/>
+              <text x="802" y="341" font-size="11" text-anchor="middle"><tspan class="d-ink">once-over</tspan><tspan class="d-faint"> · Claude ∥ Codex</tspan></text>
 
               <!-- REVIEW ENGINE enclosure -->
               <rect class="d-hair" x="250" y="356" width="676" height="270" rx="6"
