@@ -93,8 +93,8 @@ adamsworkflow/
     └── (porting = README subsection, NOT a standalone doc — see §6.9)
 ```
 
-Cross-reference integrity (Phase 1 gate): shipped commands cite
-`~/.claude/docs/harness-notes.md §N` inline today → installer places
+Cross-reference integrity (Phase 1 gate): shipped commands cite the field
+notes by their original private filename (`§N` sections) inline today → installer places
 `docs/field-notes.md` at `~/.claude/docs/field-notes.md` and shipped artifacts are
 rewritten to that path; a grep pass over every shipped artifact for `~/.claude/`
 paths verifies no dead pointers remain (the field notes ship in this repo as

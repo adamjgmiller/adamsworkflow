@@ -58,7 +58,10 @@ fi
 
 # Refuse to install into the source repo or any directory inside it: the find
 # walk below streams, so a target under the repo would recurse over files we
-# just installed, and target == repo would overwrite the sources. Compare
+# just installed, and target == repo would overwrite the sources. This guard is
+# footgun-prevention, not a security boundary: deliberately-constructed paths
+# (bind-mount aliases, embedded newlines, a mid-check symlink swap) can still
+# slip past it — you control your own CLAUDE_HOME, so that's accepted. Compare
 # PHYSICAL paths (pwd -P resolves symlinks), so a ~/.claude symlinked into this
 # repo is caught even though its logical path differs — otherwise --symlink mode
 # would alias source and destination and damage the clone. For a not-yet-created
