@@ -219,9 +219,8 @@ run.
 
 ## Serving your pages
 
-Everything in the suite that serves pages binds 127.0.0.1 by default, with
-one exception noted below — and installing starts no servers, so nothing
-listens until you run something. Opening a page to other devices is an
+Everything in the suite that serves pages binds 127.0.0.1 by default — and
+installing starts no servers, so nothing listens until you run something. Opening a page to other devices is an
 explicit opt-in: bind 0.0.0.0 if you trust the network, or — better — bind
 a private tailnet/VPN interface (e.g. Tailscale) so pages reach your phone
 without reaching anyone else.
@@ -230,9 +229,9 @@ For make-it-easy specifically: `MIE_BIND` sets the interface the server
 binds, and `MIE_HOST` sets the hostname printed in the URL — useful when
 you bind a private interface and want the printed link to use its name.
 
-One exception to the localhost default: the visual-page scaffold is served
-with plain `python3 -m http.server`, which binds all interfaces. Pass
-`--bind 127.0.0.1` to keep it local.
+Everything in the suite serves localhost-first, including the documented
+`http.server` examples (`--bind 127.0.0.1` — Python's default is
+all-interfaces, so keep the flag unless you mean to expose the page).
 
 And the teardown habit: servers here are purpose-bound. When the purpose
 completes — answers parsed, review decided, page superseded — kill the

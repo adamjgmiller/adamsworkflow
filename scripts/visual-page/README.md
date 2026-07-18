@@ -27,11 +27,11 @@ re-inventing a design system and keeps pages visually consistent. Builders copy
 Serve the built page as a static file, e.g.:
 
 ```
-python3 -m http.server <port> --directory <dir>
+python3 -m http.server <port> --bind 127.0.0.1 --directory <dir>
 ```
 
-By default `http.server` binds all interfaces; to keep it localhost-only,
-add `--bind 127.0.0.1`. To open the page from other devices, opt in
+(Without `--bind`, `http.server` binds all interfaces — keep the flag unless
+you mean to expose it.) To open the page from other devices, opt in
 explicitly: bind `0.0.0.0` on a trusted network, or preferably bind a private
 tailnet/VPN interface (e.g. Tailscale) and share that hostname/IP. Open it at
 `http://<host>:<port>/<page>.html`.
