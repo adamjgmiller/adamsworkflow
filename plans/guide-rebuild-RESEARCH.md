@@ -1,88 +1,279 @@
-# Deep-research result (verified findings)
+# Landscape survey — guide-rebuild (RESEARCH record)
+
+> Commissioned 2026-07-17 for this guide's positioning section and produced by a
+> multi-agent research run (fan-out searches, source fetches, adversarial 3-lens
+> claim verification). Findings are recorded verbatim, third person throughout.
+> Star counts and repo states are point-in-time (verified 2026-07-17); the
+> ecosystem churns fast, so treat every number here as dated, not current.
 
 ## Summary
+
 The mid-2026 public agentic-coding landscape is dominated by a few mega-repos — GitHub's Spec Kit (~122k stars, spec-driven with built-in converge/analyze verification), GSD (0→61k+ stars in under five months before being archived in June 2026), awesome-claude-code (50.2k stars), and a ~63k-star "vibe coding to agentic engineering" best-practices repo — alongside orchestration frameworks like Claude Flow's hive-mind and BMAD. Honest rarity assessment: cross-model Claude+Codex adversarial review is a real, multi-author public pattern (hamelsmu/claude-review-loop at 705 stars, OpenAI's own /codex:adversarial-review plugin command, several blogs), so Adam's dual-source review is not conceptually unique — but his integrated system (tiered review ladder with convergence criteria, work-intake routing, codified escalation-test delegation policy, probed harness notes, decision-batching) has no confirmed public equivalent; the model-tier names and per-subagent pinning are platform primitives, while the policy layer on top appears rare. The persistent-devbox pattern (Tailscale/WireGuard + ssh/mosh + tmux for phone/iPad access) is widely shared across at least eight independent personal guides, but fragmented — none mention statusline customization, and no canonical guide covers the full stack. Terminologically, "harness engineering" is in active use (Faros AI's three-phase framing; a ~3.1k-star awesome list) but every specific origin/attribution claim failed verification, and all "loop engineering" popularization claims were refuted outright — both terms should be used sparingly and without attribution.
 
-## F1 [high] GitHub's Spec Kit is the most-starred publicly-shared agentic-coding workflow system surveyed: ~122k stars (API-verified 121,960; created 2025-08-21), implementing Spec-Driven Development where specs are the primary artifact, with a built-in verification layer (/speckit.converge assesses the codebase against specs and appends remaining work as tasks; /speckit.analyze, /speckit.checklist, /speckit.clarify handle consistency and underspecification) — i.e., it is not a purely linear spec-to-code pipeline.
-evidence: Primary repo README confirms the SDD definition and all four commands verbatim; star count independently confirmed via GitHub API (121,960, pushed 2026-07-17). A separate blog claim of '93,000+ stars' was refuted as stale, reinforcing the API-verified figure.
-sources: https://github.com/github/spec-kit
-vote: 3 claims confirmed, votes 2-1/3-0/3-0
+## Verified findings
 
-## F2 [high] GSD (Get Shit Done), a lean multi-agent orchestration tool with parallel researchers/planners/executors/verifiers, went from initial commit (2025-12-14) to 61,000+ stars in under five months — the fastest-growing system found — but the original repo (gsd-build/get-shit-done, API-verified at 64,758 stars) was archived 2026-06-26 with development moved to open-gsd/gsd-core.
-evidence: Verifier confirmed created_at and star count via GitHub API and corroborated the growth curve across independent checkpoints (35K Mar 2026, 48K/58.9K Apr, 61K+ May). The archived status is a critical freshness caveat for any positioning section. A related claim that GSD's staged flow parallels Adam's docs-gated pipeline was refuted, so no claim is made about its internal gating.
-sources: https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/; https://api.github.com/repos/gsd-build/get-shit-done
-vote: 2-1, API-corroborated
+### F1 [high]
 
-## F3 [high] Large curated directories and guide repos are a major genre: hesreallyhim/awesome-claude-code has 50.2k stars / 4.4k forks; the awesomeclaude.ai directory organizes resources into ten categories (Agent Skills, Workflows & Knowledge Guides, Tooling, Status Lines, Hooks, Slash-Commands, CLAUDE.md Files, Alternative Clients, Official Documentation, Output Styles); FlorianBruniaux/claude-code-ultimate-guide has 5.5k stars / 720 forks / 782 commits (API-verified, actively pushed).
-evidence: All counts verified against live GitHub pages/API. Notably, 'Status Lines' is a named category in the directory taxonomy, so statuslines are a recognized resource type even though no devbox guide integrates them (see devbox finding). Claims about awesome-claude-code's internal section structure and its '203 resources' count were refuted and are excluded.
-sources: https://github.com/hesreallyhim/awesome-claude-code; https://awesomeclaude.ai/awesome-claude-code; https://github.com/FlorianBruniaux/claude-code-ultimate-guide
-vote: 2-1 / 2-1 / 2-1
+GitHub's Spec Kit is the most-starred publicly-shared agentic-coding workflow system surveyed: ~122k stars (API-verified 121,960; created 2025-08-21), implementing Spec-Driven Development where specs are the primary artifact, with a built-in verification layer (/speckit.converge assesses the codebase against specs and appends remaining work as tasks; /speckit.analyze, /speckit.checklist, /speckit.clarify handle consistency and underspecification) — i.e., it is not a purely linear spec-to-code pipeline.
 
-## F4 [high] shanraisshan/claude-code-best-practice is the top repo under the claude-code-best-practices GitHub topic at ~63k stars (API-verified 62,967), self-positioned as 'from vibe coding to agentic engineering' — but its ~10:1 star-to-fork ratio on an 8-month-old repo is atypical, so its popularity signal should be treated with mild suspicion when naming it in the guide.
-evidence: Star count, tagline, and #1 topic ranking verified via GitHub API (next repo in topic: 477 stars). The verifier itself flagged the fork-heavy anomaly as a merit caveat.
-sources: https://github.com/topics/claude-code-best-practices; https://github.com/shanraisshan/claude-code-best-practice
-vote: 3-0
+- **Evidence:** Primary repo README confirms the SDD definition and all four commands verbatim; star count independently confirmed via GitHub API (121,960, pushed 2026-07-17). A separate blog claim of '93,000+ stars' was refuted as stale, reinforcing the API-verified figure.
+- **Sources:** https://github.com/github/spec-kit
+- **Verification vote:** 3 claims confirmed, votes 2-1/3-0/3-0
 
-## F5 [medium] Claude Flow/Ruflo's documented architecture is a 'hive-mind': three queen roles (Strategic, Tactical, Adaptive), eight worker roles (Researcher, Coder, Tester, Reviewer, Architect, Analyst, Optimizer, Documenter), and four swarm topologies (mesh, hierarchical, ring, star) — the canonical example of the 'subagent swarm' philosophy. Its claimed 31.1k-star count was refuted, so cite the architecture, not a popularity figure.
-evidence: Architecture cross-checked against the project's own GitHub wiki and DeepWiki, not just the blog. The specific star/commit/fork numbers claim was voted down 0-3, so no traction figure survives verification for this system.
-sources: https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide; https://github.com/ruvnet/claude-flow/wiki/Hive-Mind-Intelligence
-vote: 3-0 on architecture; 0-3 on star count (refuted)
+### F2 [high]
 
-## F6 [low] BMAD-METHOD is a recognized multi-agent methodology with the upstream repo (bmad-code-org/BMAD-METHOD) at roughly 43K stars per verifier cross-reference — but the only BMAD claims that survived verification directly concern a 5-star fork (oimiragieo/BMAD-SPEC-KIT), and the specific '46,700+ stars / 12+ agents' claim was refuted, so BMAD's exact traction and internals should be re-verified before naming it prominently.
-evidence: The confirmed claim establishes only that the fork is low-traction (5 stars, verified); the ~43K upstream figure appears only inside verifier evidence as a cross-reference, and the direct BMAD-METHOD stars claim from MarkTechPost was voted down 1-2.
-sources: https://github.com/oimiragieo/BMAD-SPEC-KIT
-vote: 3-0 on the fork; upstream figures unconfirmed
+GSD (Get Shit Done), a lean multi-agent orchestration tool with parallel researchers/planners/executors/verifiers, went from initial commit (2025-12-14) to 61,000+ stars in under five months — the fastest-growing system found — but the original repo (gsd-build/get-shit-done, API-verified at 64,758 stars) was archived 2026-06-26 with development moved to open-gsd/gsd-core.
 
-## F7 [high] RARITY — cross-model review: Claude+Codex adversarial/cross-model review is a genuine multi-author public pattern, NOT unique to Adam. The most comparable working example is hamelsmu/claude-review-loop (705 stars): a Stop Hook blocks Claude's exit and runs OpenAI's Codex CLI as an independent reviewer with up to 4 parallel review sub-agents. OpenAI's own codex-plugin-cc ships /codex:review and /codex:adversarial-review commands inside Claude Code. At least three developers (Aseem Shrey, Kim Major, Hamel Husain) independently published the pattern, and smartscope.blog documents a three-level maturity model (SKILL.md slash command → Stop-Hook plugin → full gated pipeline via claude-codex / Claude-Code-Workflow / GitHub Agent HQ).
-evidence: All named repos, people, and the plugin's adversarial-review command were verified against primary sources by the verifier (8 primary fetches). Freshness caveats: claude-codex (archived Feb 2026, successor vcp) and Claude-Code-Workflow (archived Jun 2026, successor Maestro Flow) are dead; the smartscope blog's '5-round cap' convergence claim was refuted, so no public loop with Adam's exact convergence criteria is confirmed.
-sources: https://github.com/hamelsmu/claude-review-loop; https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/; https://github.com/atompilot/claude-code-cross-review; https://github.com/openai/codex-plugin-cc
-vote: 2-1 across five constituent claims, primary-source corroborated
+- **Evidence:** Verifier confirmed created_at and star count via GitHub API and corroborated the growth curve across independent checkpoints (35K Mar 2026, 48K/58.9K Apr, 61K+ May). The archived status is a critical freshness caveat for any positioning section. A related claim that GSD's staged flow parallels Adam's docs-gated pipeline was refuted, so no claim is made about its internal gating.
+- **Sources:** https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/ · https://api.github.com/repos/gsd-build/get-shit-done
+- **Verification vote:** 2-1, API-corroborated
 
-## F8 [high] RARITY — cross-model review traction: despite multiple public implementations, almost all have near-zero adoption — atompilot/claude-code-cross-review: 0 stars/0 forks; shimo4228/codex-review: 1 star (API-verified, 12-day-old repo). Only hamelsmu/claude-review-loop (705 stars) has meaningful traction. The concept is public; a popular, polished implementation is not — which is exactly the gap Adam's guide could occupy, provided it credits the existing pattern honestly.
-evidence: All three star counts verified via GitHub API/page fetch. The refuted claim about claude-review-loop's 'independent second opinion' framing (1-2) means its philosophy statement should not be quoted, only its verified mechanics.
-sources: https://github.com/atompilot/claude-code-cross-review; https://github.com/shimo4228/codex-review; https://github.com/hamelsmu/claude-review-loop
-vote: 3-0 / 2-1 / 2-1
+### F3 [high]
 
-## F9 [medium] RARITY — cross-vendor preference is publicly argued: a widely-read blog (sankalp, HN front-page reach) describes a year-long constant workflow of Claude-for-execution / GPT-o-series-for-review, explicitly claiming GPT-5.2-Codex is superior to Claude at bug-finding with fewer false positives, and better than commercial code-review products. This validates the dual-source premise Adam uses, from an independent practitioner. One research abstract suggests the reverse pairing (Claude reviewing Codex) may score better in benchmarks — the optimal direction is contested.
-evidence: Quotes verified verbatim against the post ('This Claude for execution and GPT/o-series model for review/bugs dynamic has been pretty constant for me for probably a year'). First-person anecdote, not benchmarked; the /review cross-vendor wiring actually requires OpenAI's bridge plugin, not a native Claude Code feature.
-sources: https://sankalp.bearblog.dev/my-experience-with-claude-code-20-and-how-to-get-better-at-using-coding-agents/
-vote: 2-1 / 2-1
+Large curated directories and guide repos are a major genre: hesreallyhim/awesome-claude-code has 50.2k stars / 4.4k forks; the awesomeclaude.ai directory organizes resources into ten categories (Agent Skills, Workflows & Knowledge Guides, Tooling, Status Lines, Hooks, Slash-Commands, CLAUDE.md Files, Alternative Clients, Official Documentation, Output Styles); FlorianBruniaux/claude-code-ultimate-guide has 5.5k stars / 720 forks / 782 commits (API-verified, actively pushed).
 
-## F10 [high] RARITY — model tiering: the four-tier Fable/Opus/Sonnet/Haiku ladder and per-subagent model pinning are official platform primitives, not Adam's invention — Claude Code docs define the aliases by task difficulty and document three pinning mechanisms (frontmatter model field, Agent tool model parameter, CLAUDE_CODE_SUBAGENT_MODEL) with a four-step precedence order, and confirm unconfigured subagents inherit the session model (so on an Opus-default plan even read-only Explore runs on Opus). What appears genuinely rare is Adam's codified policy layer on top: the escalation test, ceiling rule, and unbounded-fan-out pinning — the only candidate public equivalent (a two-tier orchestrator/cheap-executor article) was refuted.
-evidence: All platform facts verified verbatim against official Anthropic docs (the strongest sources in this survey). The inheritance-by-default finding independently validates Adam's 'omission is not neutral' rule. Rarity of the policy layer is inference from absence in the verified sample — high confidence on platform facts, medium on the rarity inference.
-sources: https://code.claude.com/docs/en/model-config; https://code.claude.com/docs/en/sub-agents; https://medium.com/@roanmonteiro/claude-code-subagent-model-routing-stop-paying-for-opus-on-haiku-work-ee76dc32cb88
-vote: 3-0 / 3-0 / 2-1 / 3-0
+- **Evidence:** All counts verified against live GitHub pages/API. Notably, 'Status Lines' is a named category in the directory taxonomy, so statuslines are a recognized resource type even though no devbox guide integrates them (see devbox finding). Claims about awesome-claude-code's internal section structure and its '203 resources' count were refuted and are excluded.
+- **Sources:** https://github.com/hesreallyhim/awesome-claude-code · https://awesomeclaude.ai/awesome-claude-code · https://github.com/FlorianBruniaux/claude-code-ultimate-guide
+- **Verification vote:** 2-1 / 2-1 / 2-1
 
-## F11 [medium] RARITY — verification loops in general are common in shape among top systems (Spec Kit's converge/analyze/checklist cycle; GSD's dedicated verifier agents), so 'has a verification loop' is not a differentiator. What no surveyed public system combines is Adam's specific stack: a three-tier review ladder (quick/dual/lens) with explicit convergence/steady-state/regression stopping criteria, cross-model dedup, a work-intake routing tree, docs-gated build tiering, empirically-probed harness field notes, and human-decision batching — no confirmed source exhibits more than one of these elements together.
-evidence: Positive evidence (verification loops exist in Spec Kit and GSD) is verified; the uniqueness of the combination is an absence claim over a bounded sample — honest framing for the guide is 'each element exists somewhere; the integrated system does not appear to,' not 'nobody does verification.'
-sources: https://github.com/github/spec-kit; https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/; https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/
-vote: synthesized across confirmed claims 1, 13, 18-19
+### F4 [high]
 
-## F12 [high] DEVBOX — the persistent-devbox pattern for mobile Claude Code (Tailscale or WireGuard mesh VPN + ssh/mosh + tmux, phone as thin remote control) is widely and independently shared: at least eight guides confirmed — elliotbonneville (Tailscale+tmux, explicitly framing tmux reattach vs Claude Code's /resume), petesena on Medium (Tailscale+Termius+tmux, Dec 2025), skeptrune (Tailscale+Termux+SSH+tmux for Android), danyuchn (Tailscale+Moshi+tmux for iPad, CJK-driven client choice), rogs.me (WireGuard+mosh+tmux+self-hosted ntfy), duanestorey (verbatim 'Tailscale for the network discovery, Mosh for a resilient connection, Tmux for persistent shell sessions'), zbuild (all five incl. ntfy), and the alxpck gist (multi-client tmux, 'close your laptop, come back, Claude is done'). The pattern is established folk knowledge, published as fragmented personal blogs/gists rather than one canonical popular guide.
-evidence: Every guide fetched and verified against its primary source; eight independent authors across iOS, Android, iPad, Mac, and Linux targets, Dec 2025 through Jul 2026 (the gist actively maintained, updated 2026-07-12). None have measured popularity metrics (personal blogs), so 'widely shared' means many independent authors, not proven large readership.
-sources: https://elliotbonneville.com/phone-to-mac-persistent-terminal/; https://petesena.medium.com/how-to-run-claude-code-from-your-iphone-using-tailscale-termius-and-tmux-2e16d0e5f68b; https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/; https://danyuchn.github.io/blog/posts/en/ipad-claude-code-setup/; https://rogs.me/2026/02/claude-code-from-the-beach-my-remote-coding-setup-with-mosh-tmux-and-ntfy/; https://duanestorey.com/posts/claude-code-remote-development-setup; https://www.zbuild.io/resources/news/claude-code-remote-control-mobile-terminal-handoff-guide-2026; https://gist.github.com/alxpck/d1e86d9a62e3fc5cf6c1ce52d0a02b10
-vote: unanimous or 2-1 across 10 constituent claims, all primary-verified
+shanraisshan/claude-code-best-practice is the top repo under the claude-code-best-practices GitHub topic at ~63k stars (API-verified 62,967), self-positioned as 'from vibe coding to agentic engineering' — but its ~10:1 star-to-fork ratio on an 8-month-old repo is atypical, so its popularity signal should be treated with mild suspicion when naming it in the guide.
 
-## F13 [medium] DEVBOX — the statusline is the consistently missing piece: zero of the eight verified devbox guides mention Claude Code statusline customization (verifiers ran explicit absence checks on several), mosh appears in only about half (sometimes only as a fallback), and ntfy-style notifications appear in just two. Adam's integrated stack (Tailscale + ssh/mosh + tmux + statusline) as a single coherent guide appears to be an open gap in the public literature surveyed.
-evidence: Three verifiers performed explicit negative checks (grep-style enumeration of every tool named) confirming no statusline mention; the awesomeclaude.ai directory does have a 'Status Lines' category, so statusline resources exist in isolation — the gap is their integration into the devbox stack. Absence within an 8-guide sample is not proof of absence ecosystem-wide.
-sources: https://petesena.medium.com/how-to-run-claude-code-from-your-iphone-using-tailscale-termius-and-tmux-2e16d0e5f68b; https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/; https://danyuchn.github.io/blog/posts/en/ipad-claude-code-setup/
-vote: 3-0 on each absence check
+- **Evidence:** Star count, tagline, and #1 topic ranking verified via GitHub API (next repo in topic: 477 stars). The verifier itself flagged the fork-heavy anomaly as a merit caveat.
+- **Sources:** https://github.com/topics/claude-code-best-practices · https://github.com/shanraisshan/claude-code-best-practice
+- **Verification vote:** 3-0
 
-## F14 [medium] TERMINOLOGY — 'harness engineering' is in active mid-2026 use with two verified definitional sources: Faros AI defines it as building the environment around models (feedback loops, safety boundaries, verification systems) and frames it as the third phase of AI-engineering maturity after prompt engineering and context engineering; the ai-boost/awesome-harness-engineering list (~3.1k stars) defines it as designing scaffolding (context delivery, tool interfaces, planning artifacts, verification loops, memory systems, sandboxes) that determines agent success. However, EVERY specific origin/attribution claim failed verification — OpenAI's Ryan Lopopolo (0-3), Mitchell Hashimoto coinage (0-3), OpenAI-essay lineage (0-3) — so the guide should use the term descriptively without crediting a coiner.
-evidence: Both definitions verified near-verbatim against their sources; the Faros three-phase framing is explicitly attributed as one vendor's framing, not consensus. The 'Agent = Model + Harness' formula claim from the same Faros article was refuted (1-2), so quote only the verified definition.
-sources: https://www.faros.ai/blog/harness-engineering; https://github.com/ai-boost/awesome-harness-engineering
-vote: 2-1 / 3-0 on definitions; 0-3 on all attributions
+### F5 [medium]
 
-## F15 [medium] TERMINOLOGY — 'loop engineering' should be used very sparingly or avoided: the only sourced narrative of its popularization (Peter Steinberger post + Addy Osmani essay, June 2026) was refuted 0-3, and its relationship to harness engineering (1-2) also failed. Meanwhile 'agentic engineering' has verified organic circulation — it appears in the self-positioning tagline of the ~63k-star best-practices repo ('from vibe coding to agentic engineering') — and 'context engineering' is established as the predecessor phase in Faros's framing, though Gartner's formal definition claim was refuted (1-2). Safest vocabulary for the guide: 'context engineering' and 'agentic engineering' freely, 'harness engineering' with definition-on-first-use, 'loop engineering' only as an informal coinage.
-evidence: Positive evidence: 'agentic engineering' tagline API-verified; harness-engineering definitions primary-verified. Negative evidence: three refutations (tosea.ai loop-engineering history 0-3, its harness distinction 1-2, Gartner context-engineering 1-2) mean no verified account of who uses 'loop engineering' survives — the term may still be circulating, but this survey could not substantiate any specific usage story.
-sources: https://github.com/topics/claude-code-best-practices; https://www.faros.ai/blog/harness-engineering; https://github.com/ai-boost/awesome-harness-engineering
-vote: 3-0 on tagline; refutations 0-3/1-2/1-2
+Claude Flow/Ruflo's documented architecture is a 'hive-mind': three queen roles (Strategic, Tactical, Adaptive), eight worker roles (Researcher, Coder, Tester, Reviewer, Architect, Analyst, Optimizer, Documenter), and four swarm topologies (mesh, hierarchical, ring, star) — the canonical example of the 'subagent swarm' philosophy. Its claimed 31.1k-star count was refuted, so cite the architecture, not a popularity figure.
 
-## extra key: caveats
-"Per Adam's override, every stage of this workflow including verification and synthesis ran on Sonnet \u2014 findings flagged medium/low especially warrant later spot-validation at a higher tier. Star counts are point-in-time (verified 2026-07-17) and fast-moving; several popularity figures from listicle blogs (MarkTechPost, KDnuggets, pasqualepillitteri) were refuted as stale or inflated, so only API-verified counts should appear in the guide. The ecosystem churns fast: GSD, claude-codex, and Claude-Code-Workflow were all archived within the survey window \u2014 any named-system section needs a freshness pass at publish time. All rarity/gap conclusions (Adam's policy layer, the statusline gap, the integrated-system uniqueness) are absence-of-evidence inferences over a bounded sample of ~30 verified sources, not proof of absence. The terminology sub-question is the weakest area: definitions verified, but every attribution/origin claim was refuted, and one complicating research abstract (reverse Claude-reviews-Codex pairing) was seen only via an abstract. Devbox guides are all personal blogs/gists with no readership metrics, so prevalence means author-count, not audience size. The refuted-claims list includes several that failed on precision rather than substance (e.g., codex-plugin-cc details voted 1-2 in one claim yet primary-verified inside another claim's evidence) \u2014 treat 1-2 refutations as unproven, not false."
-## extra key: openQuestions
-["Who actually coined and popularized 'harness engineering' and 'loop engineering'? Every specific attribution (Lopopolo, Hashimoto, Steinberger/Osmani, OpenAI essays) failed verification, leaving the terms' provenance unresolved \u2014 a targeted primary-source hunt (original posts, dates, view counts) would settle it.", "Does any public system codify a model-tier delegation policy with an explicit escalation test (hard AND costly-if-almost-right) comparable to Adam's? The one candidate was refuted; a search of orchestration frameworks' routing logic (Claude Flow, GSD successor, LangChain-adjacent routers) was not done.", "What is the current state of the GSD successor (open-gsd/gsd-core) and the cross-model framework successors (vcp, Maestro Flow) \u2014 did the traction follow the forks, and which of these is the live competitor at publish time?", "Are the anomalous popularity signals in this niche (shanraisshan's 10:1 star:fork ratio at 63k stars) organic, and more broadly how much of the mega-repo star landscape reflects genuine usage vs. star-farming \u2014 material to how much weight the guide's positioning section gives star counts?"]
-## extra key: refuted
-[{"claim": "The project's explicit philosophy is framed as 'independent second opinion' review before accepting changes, with real-time visibility into the review \u2014 same underlying goal as Adam's review tiers, but expressed as a single built-in feature rather than a tiered system.", "vote": "1-2", "source": "https://github.com/hamelsmu/claude-review-loop"}, {"claim": "Gartner formally defines 'context engineering' as a distinct discipline superseding prompt engineering, centered on curating dynamic context and managing persistent memory/state for AI systems rather than crafting one-off prompts.", "vote": "1-2", "source": "https://www.gartner.com/en/articles/context-engineering"}, {"claim": "The repo organizes curated Claude Code resources into named categories including skills, agents, status lines, developer tooling, and plugins, plus a dedicated 'Multi-Agent Orchestration, Skills, Memory & Context Persistence' section \u2014 positioning it as a broad directory/aggregator rather than a single opinionated workflow philosophy.", "vote": "0-3", "source": "https://github.com/hesreallyhim/awesome-claude-code"}, {"claim": "The repository is a large, actively-maintained public aggregator of Claude Code tooling (agents, skills, commands, plugins) with substantial community traction (2.3k stars, 812 forks), evidencing a thriving public ecosystem of shared Claude Code workflow resources beyond any single author's system.", "vote": "1-2", "source": "https://github.com/rohitg00/awesome-claude-code-toolkit"}, {"claim": "The Awesome Claude Code visual directory indexes 203 community resources across categories, last updated June 13, 2026.", "vote": "0-3", "source": "https://awesomeclaude.ai/awesome-claude-code"}, {"claim": "hesreallyhim's \"awesome-claude-code\" repo functions as a comprehensive curated directory of the Claude Code ecosystem (skills, hooks, commands, plugins) \u2014 direct evidence for the 'awesome-claude-code lists' category named in the research question.", "vote": "0-3", "source": "https://www.kdnuggets.com/10-github-repositories-to-master-claude-code"}, {"claim": "The gsd-build \"get-shit-done\" repo implements a staged, gated execution flow (discussion \u2192 planning \u2192 execution \u2192 verification \u2192 shipping) explicitly to reduce drift \u2014 a publicly-shared precedent for docs-gated, staged build pipelines similar in shape to Adam's PRD/Plan/Spec-gated pipeline.", "vote": "1-2", "source": "https://www.kdnuggets.com/10-github-repositories-to-master-claude-code"}, {"claim": "Claude Flow (Ruflo) had 31,100 GitHub stars as of April 2026, with 6,066 total commits and 3,500 active forks, described by the author as the most adopted open-source multi-agent platform of 2026", "vote": "0-3", "source": "https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide"}, {"claim": "GitHub Spec Kit, a community-driven spec-driven-development CLI supporting 30+ coding agents (including Claude Code), has su
-## extra key: sources
-[{"url": "https://github.com/hesreallyhim/awesome-claude-code", "quality": "secondary", "angle": "Viral repos & awesome lists", "claimCount": 5}, {"url": "https://github.com/rohitg00/awesome-claude-code-toolkit", "quality": "blog", "angle": "Viral repos & awesome lists", "claimCount": 5}, {"url": "https://github.com/quemsah/awesome-claude-plugins", "quality": "unreliable", "angle": "Viral repos & awesome lists", "claimCount": 4}, {"url": "https://awesomeclaude.ai/awesome-claude-code", "quality": "blog", "angle": "Viral repos & awesome lists", "claimCount": 5}, {"url": "https://www.kdnuggets.com/10-github-repositories-to-master-claude-code", "quality": "blog", "angle": "Viral repos & awesome lists", "claimCount": 5}, {"url": "https://github.com/topics/claude-code-best-practices", "quality": "secondary", "angle": "Viral repos & awesome lists", "claimCount": 5}, {"url": "https://github.com/kodflow/claude-flow", "quality": "unreliable", "angle": "Orchestration frameworks", "claimCount": 5}, {"url": "https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide", "quality": "blog", "angle": "Orchestration frameworks", "claimCount": 5}, {"url": "https://github.com/github/spec-kit", "quality": "primary", "angle": "Spec-driven methodologies", "claimCount": 5}, {"url": "https://github.com/oimiragieo/BMAD-SPEC-KIT", "quality": "primary", "angle": "Spec-driven methodologies", "claimCount": 5}, {"url": "https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/", "quality": "blog", "angle": "Spec-driven methodologies", "claimCount": 5}, {"url": "https://github.com/FlorianBruniaux/claude-code-ultimate-guide", "quality": "blog", "angle": "YouTube/blog practitioners", "claimCount": 4}, {"url": "https://news.ycombinator.com/item?id=46513961", "quality": "forum", "angle": "HN/X discourse", "claimCount": 5}, {"url": "https://news.ycombinator.com/item?id=48311705", "quality": "forum", "angle": "HN/X discourse", "claimCount": 5}, {"url": "https://www.developersdigest.tech/blog/what-hacker-news-gets-right-about-ai-coding-agents-2026", "quality": "blog", "angle": "HN/X discourse", "claimCount": 5}, {"url": "https://sankalp.bearblog.dev/my-experience-with-claude-code-20-and-how-to-get-better-at-using-coding-agents/", "quality": "blog", "angle": "HN/X discourse", "claimCount": 4}, {"url": "https://dev.to/galian/claude-code-workflow-best-practices-that-ship-code-na", "quality": "blog", "angle": "HN/X discourse", "claimCount": 5}, {"url": "https://medium.com/@danushidk507/workflows-in-agentic-ai-claude-code-workflows-8cac80792dd8", "quality": "blog", "angle": "HN/X discourse", "claimCount": 4}, {"url": "https://github.com/atompilot/claude-code-cross-review", "quality": "primary", "angle": "Cross-model adversarial review", "claimCount": 4}, {"url": "https://github.com/shimo4228/codex-review", "quality": "blog", "angle": "Cross-model adversarial review", "claimCount": 5}, {"url": 
+- **Evidence:** Architecture cross-checked against the project's own GitHub wiki and DeepWiki, not just the blog. The specific star/commit/fork numbers claim was voted down 0-3, so no traction figure survives verification for this system.
+- **Sources:** https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide · https://github.com/ruvnet/claude-flow/wiki/Hive-Mind-Intelligence
+- **Verification vote:** 3-0 on architecture; 0-3 on star count (refuted)
+
+### F6 [low]
+
+BMAD-METHOD is a recognized multi-agent methodology with the upstream repo (bmad-code-org/BMAD-METHOD) at roughly 43K stars per verifier cross-reference — but the only BMAD claims that survived verification directly concern a 5-star fork (oimiragieo/BMAD-SPEC-KIT), and the specific '46,700+ stars / 12+ agents' claim was refuted, so BMAD's exact traction and internals should be re-verified before naming it prominently.
+
+- **Evidence:** The confirmed claim establishes only that the fork is low-traction (5 stars, verified); the ~43K upstream figure appears only inside verifier evidence as a cross-reference, and the direct BMAD-METHOD stars claim from MarkTechPost was voted down 1-2.
+- **Sources:** https://github.com/oimiragieo/BMAD-SPEC-KIT
+- **Verification vote:** 3-0 on the fork; upstream figures unconfirmed
+
+### F7 [high]
+
+RARITY — cross-model review: Claude+Codex adversarial/cross-model review is a genuine multi-author public pattern, NOT unique to Adam. The most comparable working example is hamelsmu/claude-review-loop (705 stars): a Stop Hook blocks Claude's exit and runs OpenAI's Codex CLI as an independent reviewer with up to 4 parallel review sub-agents. OpenAI's own codex-plugin-cc ships /codex:review and /codex:adversarial-review commands inside Claude Code. At least three developers (Aseem Shrey, Kim Major, Hamel Husain) independently published the pattern, and smartscope.blog documents a three-level maturity model (SKILL.md slash command → Stop-Hook plugin → full gated pipeline via claude-codex / Claude-Code-Workflow / GitHub Agent HQ).
+
+- **Evidence:** All named repos, people, and the plugin's adversarial-review command were verified against primary sources by the verifier (8 primary fetches). Freshness caveats: claude-codex (archived Feb 2026, successor vcp) and Claude-Code-Workflow (archived Jun 2026, successor Maestro Flow) are dead; the smartscope blog's '5-round cap' convergence claim was refuted, so no public loop with Adam's exact convergence criteria is confirmed.
+- **Sources:** https://github.com/hamelsmu/claude-review-loop · https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/ · https://github.com/atompilot/claude-code-cross-review · https://github.com/openai/codex-plugin-cc
+- **Verification vote:** 2-1 across five constituent claims, primary-source corroborated
+
+### F8 [high]
+
+RARITY — cross-model review traction: despite multiple public implementations, almost all have near-zero adoption — atompilot/claude-code-cross-review: 0 stars/0 forks; shimo4228/codex-review: 1 star (API-verified, 12-day-old repo). Only hamelsmu/claude-review-loop (705 stars) has meaningful traction. The concept is public; a popular, polished implementation is not — which is exactly the gap Adam's guide could occupy, provided it credits the existing pattern honestly.
+
+- **Evidence:** All three star counts verified via GitHub API/page fetch. The refuted claim about claude-review-loop's 'independent second opinion' framing (1-2) means its philosophy statement should not be quoted, only its verified mechanics.
+- **Sources:** https://github.com/atompilot/claude-code-cross-review · https://github.com/shimo4228/codex-review · https://github.com/hamelsmu/claude-review-loop
+- **Verification vote:** 3-0 / 2-1 / 2-1
+
+### F9 [medium]
+
+RARITY — cross-vendor preference is publicly argued: a widely-read blog (sankalp, HN front-page reach) describes a year-long constant workflow of Claude-for-execution / GPT-o-series-for-review, explicitly claiming GPT-5.2-Codex is superior to Claude at bug-finding with fewer false positives, and better than commercial code-review products. This validates the dual-source premise Adam uses, from an independent practitioner. One research abstract suggests the reverse pairing (Claude reviewing Codex) may score better in benchmarks — the optimal direction is contested.
+
+- **Evidence:** Quotes verified verbatim against the post ('This Claude for execution and GPT/o-series model for review/bugs dynamic has been pretty constant for me for probably a year'). First-person anecdote, not benchmarked; the /review cross-vendor wiring actually requires OpenAI's bridge plugin, not a native Claude Code feature.
+- **Sources:** https://sankalp.bearblog.dev/my-experience-with-claude-code-20-and-how-to-get-better-at-using-coding-agents/
+- **Verification vote:** 2-1 / 2-1
+
+### F10 [high]
+
+RARITY — model tiering: the four-tier Fable/Opus/Sonnet/Haiku ladder and per-subagent model pinning are official platform primitives, not Adam's invention — Claude Code docs define the aliases by task difficulty and document three pinning mechanisms (frontmatter model field, Agent tool model parameter, CLAUDE_CODE_SUBAGENT_MODEL) with a four-step precedence order, and confirm unconfigured subagents inherit the session model (so on an Opus-default plan even read-only Explore runs on Opus). What appears genuinely rare is Adam's codified policy layer on top: the escalation test, ceiling rule, and unbounded-fan-out pinning — the only candidate public equivalent (a two-tier orchestrator/cheap-executor article) was refuted.
+
+- **Evidence:** All platform facts verified verbatim against official Anthropic docs (the strongest sources in this survey). The inheritance-by-default finding independently validates Adam's 'omission is not neutral' rule. Rarity of the policy layer is inference from absence in the verified sample — high confidence on platform facts, medium on the rarity inference.
+- **Sources:** https://code.claude.com/docs/en/model-config · https://code.claude.com/docs/en/sub-agents · https://medium.com/@roanmonteiro/claude-code-subagent-model-routing-stop-paying-for-opus-on-haiku-work-ee76dc32cb88
+- **Verification vote:** 3-0 / 3-0 / 2-1 / 3-0
+
+### F11 [medium]
+
+RARITY — verification loops in general are common in shape among top systems (Spec Kit's converge/analyze/checklist cycle; GSD's dedicated verifier agents), so 'has a verification loop' is not a differentiator. What no surveyed public system combines is Adam's specific stack: a three-tier review ladder (quick/dual/lens) with explicit convergence/steady-state/regression stopping criteria, cross-model dedup, a work-intake routing tree, docs-gated build tiering, empirically-probed harness field notes, and human-decision batching — no confirmed source exhibits more than one of these elements together.
+
+- **Evidence:** Positive evidence (verification loops exist in Spec Kit and GSD) is verified; the uniqueness of the combination is an absence claim over a bounded sample — honest framing for the guide is 'each element exists somewhere; the integrated system does not appear to,' not 'nobody does verification.'
+- **Sources:** https://github.com/github/spec-kit · https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/ · https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/
+- **Verification vote:** synthesized across confirmed claims 1, 13, 18-19
+
+### F12 [high]
+
+DEVBOX — the persistent-devbox pattern for mobile Claude Code (Tailscale or WireGuard mesh VPN + ssh/mosh + tmux, phone as thin remote control) is widely and independently shared: at least eight guides confirmed — elliotbonneville (Tailscale+tmux, explicitly framing tmux reattach vs Claude Code's /resume), petesena on Medium (Tailscale+Termius+tmux, Dec 2025), skeptrune (Tailscale+Termux+SSH+tmux for Android), danyuchn (Tailscale+Moshi+tmux for iPad, CJK-driven client choice), rogs.me (WireGuard+mosh+tmux+self-hosted ntfy), duanestorey (verbatim 'Tailscale for the network discovery, Mosh for a resilient connection, Tmux for persistent shell sessions'), zbuild (all five incl. ntfy), and the alxpck gist (multi-client tmux, 'close your laptop, come back, Claude is done'). The pattern is established folk knowledge, published as fragmented personal blogs/gists rather than one canonical popular guide.
+
+- **Evidence:** Every guide fetched and verified against its primary source; eight independent authors across iOS, Android, iPad, Mac, and Linux targets, Dec 2025 through Jul 2026 (the gist actively maintained, updated 2026-07-12). None have measured popularity metrics (personal blogs), so 'widely shared' means many independent authors, not proven large readership.
+- **Sources:** https://elliotbonneville.com/phone-to-mac-persistent-terminal/ · https://petesena.medium.com/how-to-run-claude-code-from-your-iphone-using-tailscale-termius-and-tmux-2e16d0e5f68b · https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/ · https://danyuchn.github.io/blog/posts/en/ipad-claude-code-setup/ · https://rogs.me/2026/02/claude-code-from-the-beach-my-remote-coding-setup-with-mosh-tmux-and-ntfy/ · https://duanestorey.com/posts/claude-code-remote-development-setup · https://www.zbuild.io/resources/news/claude-code-remote-control-mobile-terminal-handoff-guide-2026 · https://gist.github.com/alxpck/d1e86d9a62e3fc5cf6c1ce52d0a02b10
+- **Verification vote:** unanimous or 2-1 across 10 constituent claims, all primary-verified
+
+### F13 [medium]
+
+DEVBOX — the statusline is the consistently missing piece: zero of the eight verified devbox guides mention Claude Code statusline customization (verifiers ran explicit absence checks on several), mosh appears in only about half (sometimes only as a fallback), and ntfy-style notifications appear in just two. Adam's integrated stack (Tailscale + ssh/mosh + tmux + statusline) as a single coherent guide appears to be an open gap in the public literature surveyed.
+
+- **Evidence:** Three verifiers performed explicit negative checks (grep-style enumeration of every tool named) confirming no statusline mention; the awesomeclaude.ai directory does have a 'Status Lines' category, so statusline resources exist in isolation — the gap is their integration into the devbox stack. Absence within an 8-guide sample is not proof of absence ecosystem-wide.
+- **Sources:** https://petesena.medium.com/how-to-run-claude-code-from-your-iphone-using-tailscale-termius-and-tmux-2e16d0e5f68b · https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/ · https://danyuchn.github.io/blog/posts/en/ipad-claude-code-setup/
+- **Verification vote:** 3-0 on each absence check
+
+### F14 [medium]
+
+TERMINOLOGY — 'harness engineering' is in active mid-2026 use with two verified definitional sources: Faros AI defines it as building the environment around models (feedback loops, safety boundaries, verification systems) and frames it as the third phase of AI-engineering maturity after prompt engineering and context engineering; the ai-boost/awesome-harness-engineering list (~3.1k stars) defines it as designing scaffolding (context delivery, tool interfaces, planning artifacts, verification loops, memory systems, sandboxes) that determines agent success. However, EVERY specific origin/attribution claim failed verification — OpenAI's Ryan Lopopolo (0-3), Mitchell Hashimoto coinage (0-3), OpenAI-essay lineage (0-3) — so the guide should use the term descriptively without crediting a coiner.
+
+- **Evidence:** Both definitions verified near-verbatim against their sources; the Faros three-phase framing is explicitly attributed as one vendor's framing, not consensus. The 'Agent = Model + Harness' formula claim from the same Faros article was refuted (1-2), so quote only the verified definition.
+- **Sources:** https://www.faros.ai/blog/harness-engineering · https://github.com/ai-boost/awesome-harness-engineering
+- **Verification vote:** 2-1 / 3-0 on definitions; 0-3 on all attributions
+
+### F15 [medium]
+
+TERMINOLOGY — 'loop engineering' should be used very sparingly or avoided: the only sourced narrative of its popularization (Peter Steinberger post + Addy Osmani essay, June 2026) was refuted 0-3, and its relationship to harness engineering (1-2) also failed. Meanwhile 'agentic engineering' has verified organic circulation — it appears in the self-positioning tagline of the ~63k-star best-practices repo ('from vibe coding to agentic engineering') — and 'context engineering' is established as the predecessor phase in Faros's framing, though Gartner's formal definition claim was refuted (1-2). Safest vocabulary for the guide: 'context engineering' and 'agentic engineering' freely, 'harness engineering' with definition-on-first-use, 'loop engineering' only as an informal coinage.
+
+- **Evidence:** Positive evidence: 'agentic engineering' tagline API-verified; harness-engineering definitions primary-verified. Negative evidence: three refutations (tosea.ai loop-engineering history 0-3, its harness distinction 1-2, Gartner context-engineering 1-2) mean no verified account of who uses 'loop engineering' survives — the term may still be circulating, but this survey could not substantiate any specific usage story.
+- **Sources:** https://github.com/topics/claude-code-best-practices · https://www.faros.ai/blog/harness-engineering · https://github.com/ai-boost/awesome-harness-engineering
+- **Verification vote:** 3-0 on tagline; refutations 0-3/1-2/1-2
+
+## Caveats (from the run itself)
+
+Per Adam's override, every stage of this workflow including verification and synthesis ran on Sonnet — findings flagged medium/low especially warrant later spot-validation at a higher tier. Star counts are point-in-time (verified 2026-07-17) and fast-moving; several popularity figures from listicle blogs (MarkTechPost, KDnuggets, pasqualepillitteri) were refuted as stale or inflated, so only API-verified counts should appear in the guide. The ecosystem churns fast: GSD, claude-codex, and Claude-Code-Workflow were all archived within the survey window — any named-system section needs a freshness pass at publish time. All rarity/gap conclusions (Adam's policy layer, the statusline gap, the integrated-system uniqueness) are absence-of-evidence inferences over a bounded sample of ~30 verified sources, not proof of absence. The terminology sub-question is the weakest area: definitions verified, but every attribution/origin claim was refuted, and one complicating research abstract (reverse Claude-reviews-Codex pairing) was seen only via an abstract. Devbox guides are all personal blogs/gists with no readership metrics, so prevalence means author-count, not audience size. The refuted-claims list includes several that failed on precision rather than substance (e.g., codex-plugin-cc details voted 1-2 in one claim yet primary-verified inside another claim's evidence) — treat 1-2 refutations as unproven, not false.
+
+## Claims that FAILED verification (recorded so they are not re-cited)
+
+- **Refuted (1-2):** The project's explicit philosophy is framed as 'independent second opinion' review before accepting changes, with real-time visibility into the review — same underlying goal as Adam's review tiers, but expressed as a single built-in feature rather than a tiered system.
+  — source: https://github.com/hamelsmu/claude-review-loop
+
+- **Refuted (1-2):** Gartner formally defines 'context engineering' as a distinct discipline superseding prompt engineering, centered on curating dynamic context and managing persistent memory/state for AI systems rather than crafting one-off prompts.
+  — source: https://www.gartner.com/en/articles/context-engineering
+
+- **Refuted (0-3):** The repo organizes curated Claude Code resources into named categories including skills, agents, status lines, developer tooling, and plugins, plus a dedicated 'Multi-Agent Orchestration, Skills, Memory & Context Persistence' section — positioning it as a broad directory/aggregator rather than a single opinionated workflow philosophy.
+  — source: https://github.com/hesreallyhim/awesome-claude-code
+
+- **Refuted (1-2):** The repository is a large, actively-maintained public aggregator of Claude Code tooling (agents, skills, commands, plugins) with substantial community traction (2.3k stars, 812 forks), evidencing a thriving public ecosystem of shared Claude Code workflow resources beyond any single author's system.
+  — source: https://github.com/rohitg00/awesome-claude-code-toolkit
+
+- **Refuted (0-3):** The Awesome Claude Code visual directory indexes 203 community resources across categories, last updated June 13, 2026.
+  — source: https://awesomeclaude.ai/awesome-claude-code
+
+- **Refuted (0-3):** hesreallyhim's "awesome-claude-code" repo functions as a comprehensive curated directory of the Claude Code ecosystem (skills, hooks, commands, plugins) — direct evidence for the 'awesome-claude-code lists' category named in the research question.
+  — source: https://www.kdnuggets.com/10-github-repositories-to-master-claude-code
+
+- **Refuted (1-2):** The gsd-build "get-shit-done" repo implements a staged, gated execution flow (discussion → planning → execution → verification → shipping) explicitly to reduce drift — a publicly-shared precedent for docs-gated, staged build pipelines similar in shape to Adam's PRD/Plan/Spec-gated pipeline.
+  — source: https://www.kdnuggets.com/10-github-repositories-to-master-claude-code
+
+- **Refuted (0-3):** Claude Flow (Ruflo) had 31,100 GitHub stars as of April 2026, with 6,066 total commits and 3,500 active forks, described by the author as the most adopted open-source multi-agent platform of 2026
+  — source: https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide
+
+- **Refuted (0-3):** GitHub Spec Kit, a community-driven spec-driven-development CLI supporting 30+ coding agents (including Claude Code), has surpassed 93,000 GitHub stars, making it one of the most popular publicly-shared spec-driven workflow tools.
+  — source: https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/
+
+- **Refuted (1-2):** BMAD-METHOD, a multi-agent orchestration framework using 12+ specialized role-separated agents with file-based handoffs, has reached 46,700+ GitHub stars and 5,500+ forks.
+  — source: https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/
+
+- **Refuted (0-3):** The project is a large template/prompt-pack collection (275 templates total) rather than a narrative workflow methodology: 23 custom agents (code-reviewer, test-writer, security-auditor, devops-sre, etc.) and 64 skills, plus 38 security-focused hooks.
+  — source: https://github.com/FlorianBruniaux/claude-code-ultimate-guide
+
+- **Refuted (0-3):** The repo is a Claude Code skill that wraps OpenAI's Codex CLI specifically to enable cross-model code review — directly comparable to Adam's Claude+Codex adversarial review loop.
+  — source: https://github.com/shimo4228/codex-review
+
+- **Refuted (0-3):** The site describes a 'cross-model workflow' where Claude and a second model (Codex or Gemini) run in parallel tmux panes to review each other's plans/code, with the reviewer instructed only to append findings, not rewrite the work.
+  — source: https://claude-codex.fr/en/advanced/cross-model-workflow/
+
+- **Refuted (1-2):** OpenAI released an official plugin called codex-plugin-cc on March 30, 2026, that installs Codex review capabilities directly inside Claude Code (a competitor's product) — a first for the AI coding tool market.
+  — source: https://codex.danielvaughan.com/2026/04/12/codex-plugin-cc-cross-provider-bridge/
+
+- **Refuted (1-2):** The plugin adds three cross-provider slash commands to Claude Code: /codex:review (standard code audit), /codex:adversarial-review (assumption-challenging analysis), and /codex:rescue (full task delegation to Codex agents).
+  — source: https://codex.danielvaughan.com/2026/04/12/codex-plugin-cc-cross-provider-bridge/
+
+- **Refuted (1-2):** The described review loop is bounded by a convergence criterion nearly identical in structure to Adam's default cap: it repeats until an explicit approval verdict or a maximum of 5 rounds, whichever comes first.
+  — source: https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/
+
+- **Refuted (1-2):** The article recommends a two-tier orchestrator/sub-agent model-mixing pattern in Claude Code: use Claude Opus (or a comparable frontier model) as the orchestrator for planning/review, and route routine execution work to cheaper models such as DeepSeek Coder, Gemma 3, Qwen2.5-Coder, or Claude Haiku.
+  — source: https://www.mindstudio.ai/blog/smart-orchestrator-cheaper-sub-agent-models-claude-code
+
+- **Refuted (1-2):** The author frames commercial/startup attempts at 'Claude Code on mobile' as merely wrapping the same open primitives (Tailscale/Termux/SSH/tmux) that a DIY user can assemble directly, implying no dominant/canonical commercial or open-source mobile-devbox product has displaced the DIY approach.
+  — source: https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/
+
+- **Refuted (1-2):** The article's core framework is the formula 'Agent = Model + Harness,' asserting the model supplies raw intelligence while the harness (loops, guardrails, verification) is what makes that intelligence usable/reliable in practice — directly relevant to how 'harness engineering' is being used as a term of art in mid-2026.
+  — source: https://www.faros.ai/blog/harness-engineering
+
+- **Refuted (0-3):** The term 'loop engineering' was popularized in June 2026, credited to Peter Steinberger (of the OpenClaw project), who posted about the shift from prompting to designing loops on June 7, 2026 (reportedly reaching 6.5M views), followed by Addy Osmani (Google engineer) publishing a structuring essay titled 'Loop Engineering' on June 8, 2026.
+  — source: https://tosea.ai/blog/loop-engineering-ai-agents-complete-guide-2026
+
+- **Refuted (1-2):** 'Harness engineering' is defined by the article as the broader scaffolding layer around an agent (tools, constraints, feedback loops) that makes agents reliable, distinct from and encompassing loop engineering.
+  — source: https://tosea.ai/blog/loop-engineering-ai-agents-complete-guide-2026
+
+- **Refuted (0-3):** OpenAI's Ryan Lopopolo formalized/popularized the 'harness engineering' concept on Feb 11, 2026 with a specific tagline framing the human-agent division of labor.
+  — source: https://www.augmentcode.com/guides/harness-engineering-ai-coding-agents
+
+- **Refuted (0-3):** The article credits Mitchell Hashimoto (HashiCorp co-founder) with coining 'harness engineering' in early February 2026 in a personal blog post, and explicitly distinguishes this from Andrej Karpathy, who it says coined the adjacent terms 'agentic engineering' and 'context engineering' but NOT 'harness engineering' — i.e., the article treats these as three distinct, separately-attributed terms of art.
+  — source: https://www.augmentcode.com/guides/harness-engineering-ai-coding-agents
+
+- **Refuted (1-2):** The repo's philosophy explicitly frames harness engineering as a stopgap discipline: components exist only because current models can't do the job alone, and are expected to become obsolete as models improve.
+  — source: https://github.com/ai-boost/awesome-harness-engineering
+
+- **Refuted (0-3):** The term 'harness engineering' traces to OpenAI-originated essays ('Harness Engineering' and 'Unrolling the Codex Agent Loop'), with Anthropic, Martin Fowler, and LangChain cited as other contributors to the discourse.
+  — source: https://github.com/ai-boost/awesome-harness-engineering
+
+- **Refuted (0-3):** The article defines the core concept behind 'harness engineering' as the runtime wrapper around an LLM that mediates all its actions: 'An agent harness is the deterministic runtime layer that wraps an LLM. It validates, authorises, executes, and logs every action the model proposes.'
+  — source: https://medium.com/@tort_mario/ai-agent-best-practices-production-ready-harness-engineering-2026-guide-c1236d713fac
+
+## Open questions left by the survey
+- Who actually coined and popularized 'harness engineering' and 'loop engineering'? Every specific attribution (Lopopolo, Hashimoto, Steinberger/Osmani, OpenAI essays) failed verification, leaving the terms' provenance unresolved — a targeted primary-source hunt (original posts, dates, view counts) would settle it.
+- Does any public system codify a model-tier delegation policy with an explicit escalation test (hard AND costly-if-almost-right) comparable to Adam's? The one candidate was refuted; a search of orchestration frameworks' routing logic (Claude Flow, GSD successor, LangChain-adjacent routers) was not done.
+- What is the current state of the GSD successor (open-gsd/gsd-core) and the cross-model framework successors (vcp, Maestro Flow) — did the traction follow the forks, and which of these is the live competitor at publish time?
+- Are the anomalous popularity signals in this niche (shanraisshan's 10:1 star:fork ratio at 63k stars) organic, and more broadly how much of the mega-repo star landscape reflects genuine usage vs. star-farming — material to how much weight the guide's positioning section gives star counts?
+
+## Sources consulted (with per-source quality rating)
+
+| Source | Quality | Angle |
+|---|---|---|
+| https://github.com/hesreallyhim/awesome-claude-code | secondary | Viral repos & awesome lists |
+| https://github.com/rohitg00/awesome-claude-code-toolkit | blog | Viral repos & awesome lists |
+| https://github.com/quemsah/awesome-claude-plugins | unreliable | Viral repos & awesome lists |
+| https://awesomeclaude.ai/awesome-claude-code | blog | Viral repos & awesome lists |
+| https://www.kdnuggets.com/10-github-repositories-to-master-claude-code | blog | Viral repos & awesome lists |
+| https://github.com/topics/claude-code-best-practices | secondary | Viral repos & awesome lists |
+| https://github.com/kodflow/claude-flow | unreliable | Orchestration frameworks |
+| https://pasqualepillitteri.it/en/news/774/claude-flow-ruflo-multi-agent-orchestration-guide | blog | Orchestration frameworks |
+| https://github.com/github/spec-kit | primary | Spec-driven methodologies |
+| https://github.com/oimiragieo/BMAD-SPEC-KIT | primary | Spec-driven methodologies |
+| https://www.marktechpost.com/2026/05/08/9-best-ai-tools-for-spec-driven-development-in-2026-kiro-bmad-gsd-and-more-compare/ | blog | Spec-driven methodologies |
+| https://github.com/FlorianBruniaux/claude-code-ultimate-guide | blog | YouTube/blog practitioners |
+| https://news.ycombinator.com/item?id=46513961 | forum | HN/X discourse |
+| https://news.ycombinator.com/item?id=48311705 | forum | HN/X discourse |
+| https://www.developersdigest.tech/blog/what-hacker-news-gets-right-about-ai-coding-agents-2026 | blog | HN/X discourse |
+| https://sankalp.bearblog.dev/my-experience-with-claude-code-20-and-how-to-get-better-at-using-coding-agents/ | blog | HN/X discourse |
+| https://dev.to/galian/claude-code-workflow-best-practices-that-ship-code-na | blog | HN/X discourse |
+| https://medium.com/@danushidk507/workflows-in-agentic-ai-claude-code-workflows-8cac80792dd8 | blog | HN/X discourse |
+| https://github.com/atompilot/claude-code-cross-review | primary | Cross-model adversarial review |
+| https://github.com/shimo4228/codex-review | blog | Cross-model adversarial review |
+| https://claude-codex.fr/en/advanced/cross-model-workflow/ | blog | Cross-model adversarial review |
+| https://codex.danielvaughan.com/2026/04/12/codex-plugin-cc-cross-provider-bridge/ | blog | Cross-model adversarial review |
+| https://github.com/hamelsmu/claude-review-loop | primary | Review-loop convergence |
+| https://smartscope.blog/en/blog/claude-code-codex-review-loop-automation-2026/ | blog | Review-loop convergence |
+| https://mcpmarket.com/tools/skills/review-loop | unreliable | Review-loop convergence |
+| https://www.mindstudio.ai/blog/smart-orchestrator-cheaper-sub-agent-models-claude-code | blog | Model-tiering delegation |
+| https://medium.com/@roanmonteiro/claude-code-subagent-model-routing-stop-paying-for-opus-on-haiku-work-ee76dc32cb88 | blog | Model-tiering delegation |
+| https://code.claude.com/docs/en/model-config | primary | Model-tiering delegation |
+| https://elliotbonneville.com/phone-to-mac-persistent-terminal/ | blog | Devbox via Tailscale |
+| https://petesena.medium.com/how-to-run-claude-code-from-your-iphone-using-tailscale-termius-and-tmux-2e16d0e5f68b | blog | Devbox via Tailscale |
+| https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/ | blog | Devbox via Tailscale |
+| https://danyuchn.github.io/blog/posts/en/ipad-claude-code-setup/ | blog | Devbox via Tailscale |
+| https://anurajrp.io/notes/remote-dev-setup-ipad-termius-tailscale/ | unreliable | Devbox via Tailscale |
+| https://rogs.me/2026/02/claude-code-from-the-beach-my-remote-coding-setup-with-mosh-tmux-and-ntfy/ | blog | Remote/mobile agent sessions |
+| https://explainx.ai/blog/claude-code-mobile-remote-control-phone-guide-2026 | unreliable | Remote/mobile agent sessions |
+| https://duanestorey.com/posts/claude-code-remote-development-setup | blog | Remote/mobile agent sessions |
+| https://www.zbuild.io/resources/news/claude-code-remote-control-mobile-terminal-handoff-guide-2026 | blog | Remote/mobile agent sessions |
+| https://gist.github.com/alxpck/d1e86d9a62e3fc5cf6c1ce52d0a02b10 | blog | Remote/mobile agent sessions |
+| https://www.blle.co/blog/claude-code-tmux-beautiful-terminal | unreliable | Remote/mobile agent sessions |
+| https://explainx.ai/blog/anthropic-engineer-loops-prompts-ai-coding-harness-engineering-2026 | unreliable | Harness/loop engineering terms |
+| https://www.faros.ai/blog/harness-engineering | blog | Harness/loop engineering terms |
+| https://tosea.ai/blog/loop-engineering-ai-agents-complete-guide-2026 | blog | Harness/loop engineering terms |
+| https://www.augmentcode.com/guides/harness-engineering-ai-coding-agents | blog | Harness/loop engineering terms |
+| https://github.com/ai-boost/awesome-harness-engineering | blog | Harness/loop engineering terms |
+| https://medium.com/@tort_mario/ai-agent-best-practices-production-ready-harness-engineering-2026-guide-c1236d713fac | blog | Harness/loop engineering terms |
+| https://www.gartner.com/en/articles/context-engineering | primary | Adjacent terms-of-art |
+| https://intuitionlabs.ai/articles/context-engineering-vs-prompt-engineering-ai | blog | Adjacent terms-of-art |
+| https://syedsartaj.com/blogs/context-engineering-vs-prompt-engineering-2026 | blog | Adjacent terms-of-art |
+| https://www.elastic.co/search-labs/blog/context-engineering-vs-prompt-engineering | blog | Adjacent terms-of-art |
+| https://www.deepset.ai/blog/context-engineering-the-next-frontier-beyond-prompt-engineering | blog | Adjacent terms-of-art |
+| https://arxiv.org/pdf/2603.16021 | primary | Adjacent terms-of-art |
