@@ -41,6 +41,20 @@ Current: PHASE 1 COMPLETE (S1–S5 + once-over + fixes + trailer purge). Phase 2
 ## Phase 3 — flagship visual (2026-07-18, overnight)
 - Re-invoked page-designer (named agent) to grow the approved design sample into
   docs/index.html + .nojekyll; conductor commits after review.
+- PASS — page delivered (70KB, self-contained, 6 SVG diagrams, verified
+  light/dark/390), two accuracy self-catches by designer; conductor fixed mock
+  statusline host to a neutral placeholder, added README visual-map link, committed
+  2578f2d. Gate green. Judgment calls 1–2 accepted as built.
+
+## Phase 5 — full-branch review loop (2026-07-18, overnight)
+- Dispatched stage-runner (opus) to run review-fix-loop wrapping lens-review over
+  frozen scope merge-base..2578f2d.
+- Mid-run recovery: runner's Round-1 lens orchestrator stranded its own 14-child
+  collection two levels down (double-nested joins — harness fragility at depth;
+  config-feedback candidate). Runner reconciled via transcript, flattened topology
+  (7 direct lens leaves + self-driven detached Codex with sentinel polling,
+  file-based report recovery), folded in surfaced findings, continuing. Scope
+  unchanged, no redetect.
 
 ## Stage plan
 - S1 snapshot live config → scratchpad (NEVER committed) + fix-round delta report — opus
