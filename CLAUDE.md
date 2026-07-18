@@ -4,7 +4,7 @@ This file describes the repository for the Claude Code agent whose human just cl
 
 ## What this repo is
 
-A config-share repo: the actual commands, skills, agent defs, scripts, and workflow one person runs at `~/.claude/` for high-volume parallel Claude Code work, generalized for adoption. Two kinds of content travel together — the working artifact suite (`commands/`, `skills/`, `agents/`, `scripts/`, `workflows/`) and the reference documents that make it self-sufficient (`README.md`, `CLAUDE-global.md`, `docs/field-notes.md`, this file). It is a snapshot of a live, evolving config, not a framework.
+A guide plus a config-share: the actual commands, skills, agent defs, scripts, and workflow one person runs at `~/.claude/` for high-volume parallel Claude Code work, generalized for adoption. Two kinds of content travel together — the working artifact suite (`commands/`, `skills/`, `agents/`, `scripts/`, `workflows/`) and the reference documents that make it self-sufficient (`README.md`, `CLAUDE-global.md`, `docs/field-notes.md`, this file). It is a snapshot of a live, evolving config, not a framework.
 
 ## The map
 
