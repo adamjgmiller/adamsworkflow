@@ -6,6 +6,8 @@
 # Skipped on purpose: README.md, CLAUDE.md, CLAUDE-global.md, docs/devbox.md,
 # docs/design-sample.html (reference docs you merge into your own config by
 # choice), and scripts/check-leakage.sh (a repo-maintenance tool, not config).
+# Of docs/, only field-notes.md is installed — everything else under docs/
+# (index.html and .nojekyll, the GitHub Pages site) is not installed.
 #
 # Usage:
 #   ./install.sh --symlink     # symlink each file (git pull updates live config)
@@ -15,20 +17,25 @@
 #
 # Conflict handling:
 #   If a target file already exists, it's backed up to <file>.bak-<timestamp>
-#   before being replaced. Existing symlinks pointing into this same repo are
-#   left alone (idempotent re-runs are a no-op). After installing, stale v1
-#   symlinks (links into this clone whose source file no longer exists) are
-#   removed — see the README's migration section.
+#   before being replaced (copy mode skips files already byte-identical). In
+#   symlink mode, symlinks already pointing into this repo are left alone, so
+#   re-runs are a no-op; copy mode replaces such a symlink with a real copy.
+#   After installing, stale v1 symlinks (links into this clone whose source
+#   file no longer exists) are removed — see the README's migration section.
 set -euo pipefail
 
 MODE=""
 DRY_RUN=0
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# CLAUDE_HOME only controls where THIS installer writes files; Claude Code
+# itself reads config from ~/.claude unless you also set CLAUDE_CONFIG_DIR to
+# the same path, so relocating with CLAUDE_HOME alone installs where Claude
+# Code won't look.
 TARGET_DIR="${CLAUDE_HOME:-$HOME/.claude}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 usage() {
-  sed -n '2,21p' "$0"
+  sed -n '2,24p' "$0"
   exit "${1:-0}"
 }
 
@@ -47,6 +54,23 @@ if [[ -z "$MODE" ]]; then
   echo "Error: pick one of --symlink or --copy." >&2
   echo >&2
   usage 1
+fi
+
+# Refuse to install into the source repo or any directory inside it: the find
+# walk below streams, so a target under the repo would recurse over files we
+# just installed, and target == repo would overwrite the sources. REPO_DIR is
+# already canonical (cd+pwd); canonicalize the target the same way when it
+# already exists, else fall back to an absolute form.
+if ! target_abs="$(cd "$TARGET_DIR" 2>/dev/null && pwd)"; then
+  case "$TARGET_DIR" in
+    /*) target_abs="$TARGET_DIR" ;;
+    *)  target_abs="$PWD/$TARGET_DIR" ;;
+  esac
+fi
+if [[ "$target_abs" == "$REPO_DIR" || "$target_abs" == "$REPO_DIR"/* ]]; then
+  echo "Error: target ($target_abs) is the source repo or a directory inside it." >&2
+  echo "Pick a target outside $REPO_DIR (unset CLAUDE_HOME to use ~/.claude)." >&2
+  exit 1
 fi
 
 # Directories walked in full. check-leakage.sh is pruned from scripts/ below.
@@ -69,6 +93,19 @@ do_cmd() {
   fi
 }
 
+# backup_path <dest> — echo a non-colliding "<dest>.bak-<STAMP>" path. STAMP has
+# one-second resolution, so two installs in the same second could otherwise
+# target the same backup name; append .1, .2, … until the name is free so
+# neither run clobbers the other's backup.
+backup_path() {
+  local candidate="$1.bak-$STAMP" n=1
+  while [[ -e "$candidate" ]]; do
+    candidate="$1.bak-$STAMP.$n"
+    n=$((n + 1))
+  done
+  printf '%s' "$candidate"
+}
+
 # install_one <relative-path-from-REPO_DIR>
 # e.g. install_one commands/orchestrate.md
 install_one() {
@@ -83,15 +120,26 @@ install_one() {
   if [[ -L "$dest" ]]; then
     local link_target
     link_target="$(readlink "$dest")"
-    if [[ "$link_target" == "$src" ]]; then
+    # An exact-match symlink into this repo is a finished symlink install and a
+    # no-op ONLY in symlink mode. In copy mode we must replace it with a real
+    # file, so fall through to back the symlink up first.
+    if [[ "$link_target" == "$src" && "$MODE" == "symlink" ]]; then
       say "  ok    $rel (already symlinked to this repo)"
       return 0
     fi
+    local bak; bak="$(backup_path "$dest")"
     say "  backup $rel (existing symlink -> $link_target)"
-    do_cmd mv "$dest" "$dest.bak-$STAMP"
+    do_cmd mv "$dest" "$bak"
   elif [[ -e "$dest" ]]; then
-    say "  backup $rel (existing file -> $dest.bak-$STAMP)"
-    do_cmd mv "$dest" "$dest.bak-$STAMP"
+    # Copy mode: an existing byte-identical copy is a true no-op — skip the
+    # needless backup churn (and the same-second STAMP collision it risks).
+    if [[ "$MODE" == "copy" ]] && cmp -s "$src" "$dest"; then
+      say "  ok    $rel (identical copy already in place)"
+      return 0
+    fi
+    local bak; bak="$(backup_path "$dest")"
+    say "  backup $rel (existing file -> $bak)"
+    do_cmd mv "$dest" "$bak"
   fi
 
   if [[ "$MODE" == "symlink" ]]; then
@@ -143,10 +191,12 @@ say "Target:  $TARGET_DIR"
 say ""
 
 # Walk every regular file under the config directories, preserving structure.
-# Prune gitignored build junk, .gitignore files themselves, and the repo-only
-# leakage gate.
+# Prune gitignored build junk (incl. .DS_Store), .gitignore files themselves,
+# and the repo-only leakage gate. Note: pruning .gitignore also drops
+# scripts/.gitignore, so scripts/ has two exclusions (check-leakage.sh and its
+# .gitignore) even though the README names only check-leakage.sh.
 while IFS= read -r -d '' f; do
-  rel="${f#$REPO_DIR/}"
+  rel="${f#"$REPO_DIR"/}"
   install_one "$rel"
 done < <(find "${WALK_DIRS[@]/#/$REPO_DIR/}" \
               -type f \
@@ -154,6 +204,7 @@ done < <(find "${WALK_DIRS[@]/#/$REPO_DIR/}" \
               ! -path '*/__pycache__/*' \
               ! -name '*.bak-*' \
               ! -name '.gitignore' \
+              ! -name '.DS_Store' \
               ! -path "$REPO_DIR/scripts/check-leakage.sh" \
               -print0)
 
@@ -167,5 +218,5 @@ fi
 migrate_v1
 
 say ""
-say "Done. Backups (if any) end in .bak-$STAMP."
+say "Done. Backups (if any) are named <file>.bak-$STAMP (a .N suffix is added if that name was already taken)."
 say "Open Claude Code and your commands/skills should appear in the available list."

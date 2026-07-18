@@ -126,7 +126,8 @@ phone all work. I wouldn't write a thousand lines of code this way, but
 that's not what it's for.
 
 **Claude Code Remote (web or desktop app), any device.** This controls
-the same session on the devbox through a nicer UI when you want one. The
+the same session on the devbox through a nicer UI when you want one
+(availability and setup vary — check current Claude Code docs). The
 thing it does that a terminal-over-ssh can't: image upload and download.
 If you need to paste a screenshot to an agent or pull an image back out,
 this is the path. I prefer the terminal most of the time, but this is the
@@ -221,9 +222,10 @@ none of them cover. Credit where it's due; all of these are worth reading:
 
 Honest limits:
 
-- **Image paste needs the Remote app.** A terminal over ssh/mosh can't
-  move images. If your workflow leans on screenshots in and out, plan on
-  Claude Code Remote for that part.
+- **Image paste needs the Remote app.** A terminal over ssh/mosh doesn't
+  do image upload/download the way the Remote app does. If your workflow
+  leans on screenshots in and out, plan on Claude Code Remote for that
+  part.
 - **You own a server now.** Updates, patches, and security are yours to
   keep up with. A box exposed only over Tailscale is a much smaller
   target than a public SSH host, but "always on and reachable" still

@@ -22,10 +22,13 @@ resume from the saved state.
 
 ## Credentials (bring your own key)
 
-Media generation uses Google's Gemini models. Set **one** of:
+Media generation uses Google's Gemini models. Set up **one** of these two
+routes:
 
-- `GOOGLE_CLOUD_PROJECT` — Google Vertex AI. This is the tested path.
-- `GEMINI_API_KEY` — the Gemini Developer API (alternative; model and region
+- **Vertex AI** (the tested path): set `GOOGLE_CLOUD_PROJECT` to a GCP project
+  with the Vertex AI API enabled, plus ADC or service-account credentials
+  (`GOOGLE_APPLICATION_CREDENTIALS`) if you're not on gcloud ADC.
+- **Gemini Developer API**: set `GEMINI_API_KEY` (alternative; model and region
   availability may differ from Vertex).
 
 If **neither** is set, media generation is skipped with a notice and the run

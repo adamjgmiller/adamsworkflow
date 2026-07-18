@@ -11,10 +11,13 @@
   /* ---------- persistence ---------- */
   let saveTimer = null;
   function flagSaving() {
-    const el = $("#saveState"); el.classList.add("saving"); $("#saveLabel").textContent = "Saving";
+    const el = $("#saveState"); el.classList.remove("unsaved"); el.classList.add("saving"); $("#saveLabel").textContent = "Saving";
   }
   function flagSaved() {
-    const el = $("#saveState"); el.classList.remove("saving"); $("#saveLabel").textContent = "Saved";
+    const el = $("#saveState"); el.classList.remove("saving", "unsaved"); $("#saveLabel").textContent = "Saved";
+  }
+  function flagUnsaved() {
+    const el = $("#saveState"); el.classList.remove("saving"); el.classList.add("unsaved"); $("#saveLabel").textContent = "Not saved — retrying";
   }
   function flashSavedChip() {
     const chip = $(".saved-chip", stage);
@@ -25,13 +28,21 @@
   }
   async function save(now = false) {
     clearTimeout(saveTimer);
-    const body = JSON.stringify({ answers: state.answers, cursor: state.cursor });
     const doPost = async () => {
       flagSaving();
-      try { await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body }); }
-      catch (e) { /* offline: keep local */ }
-      flagSaved();
-      flashSavedChip();
+      // rebuild the body at post time so a retry always sends the latest state
+      const body = JSON.stringify({ answers: state.answers, cursor: state.cursor });
+      try {
+        const r = await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+        if (!r.ok) throw new Error("HTTP " + r.status);   // fetch resolves on 5xx — check explicitly
+        flagSaved();
+        flashSavedChip();
+      } catch (e) {
+        // persistence failed (offline, or server/disk error): keep local, show it, retry
+        flagUnsaved();
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(doPost, 3000);
+      }
     };
     if (now) return doPost();
     saveTimer = setTimeout(doPost, 500);
@@ -136,7 +147,7 @@
 
     $(".eyebrow", node).textContent = card.eyebrow || "";
     $(".title", node).textContent = card.title || "";
-    $(".dek", node).innerHTML = card.dek || "";
+    $(".dek", node).textContent = card.dek || "";
 
     // detail (string | {text, code, codeLabel} | array) — curate hard, expand for the heavy content
     if (card.detail) {
@@ -154,7 +165,7 @@
     });
 
     // visual
-    if (card.visual) await mountVisual($(".visual", node), card.visual);
+    if (card.visual) await mountVisual($(".visual", node), card.visual, card);
 
     // options
     const a = ans(card.id);
@@ -216,7 +227,7 @@
     if (state.tour) { const lb = $(".listen", node); playCard(card, lb, { fromTour: true }); }
   }
 
-  async function mountVisual(fig, v) {
+  async function mountVisual(fig, v, card) {
     fig.hidden = false;
     if (v.type === "svg") {
       try {
@@ -224,8 +235,15 @@
         if (v.alt) { const fc = document.createElement("figcaption"); fc.textContent = v.alt; fig.appendChild(fc); }
       } catch (e) { fig.hidden = true; }
     } else if (v.type === "image") {
+      // Mirror media_gen.py's default: a card with no explicit visual.src renders the
+      // auto-generated assets/img/<card-id>.png. If the asset is truly absent, hide the
+      // figure (onerror) rather than showing a broken image.
+      const src = v.src || (card && card.id ? `assets/img/${card.id}.png` : "");
+      if (!src) { fig.hidden = true; return; }
       const img = document.createElement("img");
-      img.src = v.src; img.alt = v.alt || ""; img.loading = "lazy";
+      img.alt = v.alt || ""; img.loading = "lazy";
+      img.onerror = () => { fig.hidden = true; };
+      img.src = src;
       fig.innerHTML = ""; fig.appendChild(img);
     }
   }
@@ -297,10 +315,22 @@
 
   /* ---------- submit ---------- */
   async function submit() {
-    await fetch("/api/complete", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers: state.answers }),
-    }).catch(() => {});
+    // Only show "Sent" after the server confirms it persisted state AND wrote the
+    // SUBMITTED sentinel. fetch resolves on HTTP errors, so check r.ok explicitly:
+    // a 5xx / unwritable state dir must surface as a retry, not a false success
+    // (otherwise no sentinel exists and `mie.py wait` hangs to its 24h timeout).
+    try {
+      const r = await fetch("/api/complete", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: state.answers }),
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+    } catch (e) {
+      flagUnsaved();
+      const nb = $(".nav-next", stage);
+      if (nb && nb.firstChild) nb.firstChild.textContent = "Couldn't send — tap to retry ";
+      return;   // leave the card in place; the button re-runs submit() on the next tap
+    }
     state.submitted = true; endTour();
     stage.innerHTML = `
       <div class="done-screen">

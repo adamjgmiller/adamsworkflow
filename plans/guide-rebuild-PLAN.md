@@ -121,10 +121,10 @@ LAN/Tailscale opt-in via env/config, documented in the serving-conventions secti
 | visual (cmd+agent+scaffold) | host default; model-note kept with Claude names |
 | guided-tour | strip hardcoded ~/Projects + personal host URL → serve convention |
 | teamwork / auto-run / ship-issues | serve convention; strip personal project/VPS/deploy references |
-| pr-auto-review, lens-review | strip Greptile trigger sections → optional "external bot" note |
+| pr-auto-review, lens-review | strip the external PR-review bot's trigger sections → optional "external bot" note |
 | dual/lens/build-system/orchestrate | verify codex preflight+degrade parity (feature, documented) |
-| statusline | usage-tracker / chezmoi-drift / account-tag segments degrade when deps absent; email→env |
-| CLAUDE-global.md | keep: routing, review tiers, delegation policy + escalation test, blast-radius, plans/ layout, ASCII-diagrams, **Config feedback (core)**. strip: chezmoi, Greptile, Tailscale specifics, pre-auths, memory paths |
+| statusline | usage-tracking / dotfile-drift / account-tag segments degrade when deps absent; email→env |
+| CLAUDE-global.md | keep: routing, review tiers, delegation policy + escalation test, blast-radius, plans/ layout, ASCII-diagrams, **Config feedback (core)**. strip: the dotfile manager, an external PR-review bot, Tailscale specifics, pre-auths, memory paths |
 | field-notes.md | probed facts w/ probe dates + "verify on your version" banner |
 | gen-image | BYO key (Vertex or Gemini API) |
 

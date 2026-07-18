@@ -15,7 +15,7 @@ A guide plus a config-share: the actual commands, skills, agent defs, scripts, a
 | `agents/` | 4 reusable agent defs — `stage-runner`, `codex-runner`, `make-it-easy`, `visual-builder` — plus a conventions `README.md` |
 | `scripts/` | 4 script packages backing the commands/agents — `make-it-easy/` (walkthrough-page engine), `gen-image/`, `visual-page/` (HTML scaffold), `tmux/` (activity indicators) |
 | `workflows/` | 1 Workflow script — `adams-deep-research.js` (model-tiered deep research) |
-| `docs/` | `field-notes.md` (empirically probed harness behaviors the suite cites as "field-notes §N"), a draft chapter on the always-on dev box setup, and a design-sample page |
+| `docs/` | `field-notes.md` (empirically probed harness behaviors the suite cites as "field-notes §N"), a draft chapter on the always-on dev box setup, a design-sample page, and `index.html` (the published one-page visual map, served via GitHub Pages / `.nojekyll`) |
 | `install.sh` | Mirrors suite files into `~/.claude/` by symlink or copy, with timestamped backups of anything it would replace |
 | `CLAUDE-global.md` | The owner's global `~/.claude/CLAUDE.md`, generalized — sections meant to be merged selectively into an adopter's own global config |
 | `README.md` | The guide itself — what the pieces are, how they fit, and the serving/install story |
@@ -80,7 +80,7 @@ One row per shipped artifact: what it hard-requires, how it degrades when a requ
 ## Adaptation pointers
 
 - **Serving convention.** Everything in the suite that serves pages defaults to 127.0.0.1 (localhost-only). Opening a page to other devices is an explicit opt-in: binding 0.0.0.0 on a trusted network, or preferably a private tailnet/VPN interface. The README's serving section carries the detail; the one all-interfaces default in the suite (`python3 -m http.server`) is noted in its matrix row above.
-- **BYO keys.** Image/audio generation runs on the adopter's own Google credentials — `GOOGLE_CLOUD_PROJECT` (Vertex, the tested path) or `GEMINI_API_KEY`. With neither set, gen-image exits with a message and make-it-easy builds text-only pages; nothing else in the suite needs a key.
+- **BYO keys.** Image/audio generation runs on the adopter's own Google credentials, via either route: Vertex (the tested path) — `GOOGLE_CLOUD_PROJECT` set to a project with the Vertex AI API enabled, plus ADC or service-account credentials (`GOOGLE_APPLICATION_CREDENTIALS`) when not on gcloud ADC — or `GEMINI_API_KEY`. With neither set, gen-image exits with a message and make-it-easy builds text-only pages; nothing else in the suite needs a key.
 - **Field notes install path.** The suite cites `~/.claude/docs/field-notes.md`; the repo copy is `docs/field-notes.md`. Those notes are dated, version-sensitive probe results — the file's own banner says to re-verify on the Claude Code version in use.
 - **`CLAUDE-global.md` is merge-by-choice.** Its sections are designed to be merged selectively into an adopter's own `~/.claude/CLAUDE.md`. Its "Authorization grants" section deliberately describes — rather than makes — the grants only the adopter can decide on.
 - **Codex CLI is optional almost everywhere.** The review commands preflight `command -v codex` and degrade to labeled Claude-only reviews; only the `codex-consult` skill itself hard-requires it.

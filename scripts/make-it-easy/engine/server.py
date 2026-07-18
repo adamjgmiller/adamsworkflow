@@ -26,6 +26,7 @@ HOST_FILE = os.path.join(STATE_DIR, "HOST")  # display host, read back by `mie.p
 PORT = int(os.environ.get("PORT", "0"))  # 0 = OS assigns a free port (multi-instance safe)
 HOST = os.environ.get("MIE_HOST", "127.0.0.1")   # hostname/IP shown in the URL
 BIND = os.environ.get("MIE_BIND", HOST)          # interface to bind; defaults to HOST
+MAX_BODY = 5 * 1024 * 1024                        # cap request bodies (single-user blob is tiny)
 _LOCK = threading.Lock()
 
 CONTENT_TYPES = {
@@ -71,8 +72,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _safe_path(self, urlpath):
         rel = urlpath.lstrip("/") or "index.html"
-        full = os.path.normpath(os.path.join(ROOT, rel))
-        if full != ROOT and not full.startswith(ROOT + os.sep):  # block traversal + sibling-prefix
+        # realpath + commonpath (mirrors media_gen._inside_run): resolves symlinks so a
+        # link under ROOT that points outside ROOT is rejected — unlike lexical normpath,
+        # which a symlink could slip past.
+        full = os.path.realpath(os.path.join(ROOT, rel))
+        root_real = os.path.realpath(ROOT)
+        if os.path.commonpath([full, root_real]) != root_real:  # block traversal + escapes
             return None
         return full
 
@@ -106,19 +111,41 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _read_body(self):
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        if length <= 0:
-            return {}
+        """Parse the JSON request body, returning (error, obj).
+
+        error is None on success (obj is a dict). Otherwise it is an (code, msg)
+        pair the caller turns into a structured response instead of crashing on a
+        malformed request: non-numeric/oversized Content-Length, bad JSON/encoding,
+        or a non-object top-level value.
+        """
+        raw = self.headers.get("Content-Length", "0") or "0"
         try:
-            return json.loads(self.rfile.read(length).decode() or "{}")
-        except json.JSONDecodeError:
-            return None
+            length = int(raw)
+        except ValueError:
+            return (400, "bad content-length"), None
+        if length < 0:
+            return (400, "bad content-length"), None
+        if length > MAX_BODY:
+            return (413, "payload too large"), None
+        if length == 0:
+            return None, {}
+        try:
+            obj = json.loads(self.rfile.read(length).decode() or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return (400, "bad json"), None
+        if not isinstance(obj, dict):
+            return (400, "body must be a json object"), None
+        return None, obj
 
     def do_POST(self):
         path = urlparse(self.path).path
-        body = self._read_body()
-        if body is None:
-            return self._json({"ok": False, "error": "bad json"}, 400)
+        err, body = self._read_body()
+        if err is not None:
+            code, msg = err
+            # body may be unread (oversize) or its length unknown (bad length) — don't
+            # reuse a possibly-desynced keep-alive connection.
+            self.close_connection = True
+            return self._json({"ok": False, "error": msg}, code)
 
         if path == "/api/state":
             with _LOCK:

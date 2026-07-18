@@ -86,8 +86,10 @@ STYLE = ("Say this warmly and calmly, like a thoughtful concierge winding down a
 
 
 def save_wav(path, pcm, rate=24000):
-    with wave.open(path, "wb") as w:
+    tmp = path + ".tmp"
+    with wave.open(tmp, "wb") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(pcm)
+    os.replace(tmp, path)   # atomic: an interrupted write leaves <path>.tmp, not a partial WAV
 
 
 def gen_audio(card, voice):
@@ -134,8 +136,10 @@ def gen_image(card):
                  if p.inline_data and p.inline_data.data), None)
     if data is None:
         raise RuntimeError("no image part in response")
-    with open(out, "wb") as f:
+    tmp = out + ".tmp"
+    with open(tmp, "wb") as f:
         f.write(data)
+    os.replace(tmp, out)    # atomic: no partial PNG that a later run would skip as "done"
     return f"{card['id']} image: ok"
 
 
@@ -154,8 +158,12 @@ def main():
         sys.exit(f"media_gen: no spec.json in run dir: {RUN}")
     spec = json.load(open(os.path.join(RUN, "spec.json")))
     cards = spec.get("cards", [])
-    for c in cards:                          # validate every id up front (path safety)
-        _kebab_id(c.get("id", ""))
+    seen = set()
+    for c in cards:                          # validate every id up front (path safety + uniqueness)
+        cid = _kebab_id(c.get("id", ""))
+        if cid in seen:                      # ids map to output filenames — duplicates collide
+            sys.exit(f"media_gen: duplicate card id {cid!r} — card ids must be unique.")
+        seen.add(cid)
     voice = spec.get("voice", VOICE_DEFAULT)
     os.makedirs(os.path.join(RUN, "assets", "audio"), exist_ok=True)
 

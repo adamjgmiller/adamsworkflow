@@ -52,7 +52,7 @@ Prerequisites, in one table:
 | git | assumed everywhere — reviews scope themselves with a diff (`/quick-review` needs nothing else) |
 | `gh` | `/ship-issues`, `/pr-auto-review`, `/auto-merge-main`, build-system's PR phases |
 | Codex CLI | OpenAI's CLI, on its own account. Optional everywhere except the `codex-consult` skill itself: every review vehicle preflights `command -v codex` and, when it is absent, degrades by design to a labeled single-source review |
-| a Google key | `gen-image`, and media on make-it-easy pages. Both degrade: a text-only page, or a clear exit message saying which key to set |
+| Google credentials | `gen-image`, and media on make-it-easy pages. Either route: Vertex (`GOOGLE_CLOUD_PROJECT` + the Vertex AI API enabled + ADC/service-account creds) or `GEMINI_API_KEY`. Without them, make-it-easy builds a text-only page while gen-image exits with a message naming the keys to set |
 | python3 | the page-serving engines |
 | tmux | the activity indicators |
 | `frontend-design` plugin | named by `guided-tour` (click-through code tours), `teamwork`, and `visual` as a quality bar; all three run without it |
@@ -67,7 +67,7 @@ This table is the "Choosing the vehicle" section of
 | Trivial edit, pure Q&A | do it inline — no ceremony |
 | Staged execution of a plan — one exists or you'll write one | `/orchestrate` |
 | Meaningful repo change from a raw request | `/build-system` |
-| GitHub issues to resolve, or an existing PR to ship | `/ship-issues` — review only: `/pr-auto-review`; PR behind main: `/auto-merge-main` |
+| GitHub issues to resolve, or an existing PR to ship | `/ship-issues` — PR-stage review + fix + promote: `/pr-auto-review`; PR behind main: `/auto-merge-main` |
 | Non-code or mixed deliverable (research, proposal, docs) | `/teamwork` |
 | Long unattended goal that must not stop for questions | `/auto-run` |
 | A batch of decisions for the human | `/make-it-easy` (visual page) or `/askme` (inline) |
@@ -200,7 +200,10 @@ dispatch, because omission is not neutral. Anthropic's own documentation
 confirms that unpinned subagents inherit the session model
 ([docs](https://code.claude.com/docs/en/sub-agents)) — leave the field off
 on an expensive session and the child silently runs at the top tier,
-without anyone deciding that. The full policy — tier guide, ceiling,
+without anyone deciding that. (Two caveats keep this from being absolute: a
+few workflows deliberately inherit the session model, documented per-stage;
+and `CLAUDE_CODE_SUBAGENT_MODEL` / the session's available-models set can
+override a per-invocation choice.) The full policy — tier guide, ceiling,
 fan-out rules, the standing exceptions — is in
 [CLAUDE-global.md](./CLAUDE-global.md); I won't reproduce it here.
 
@@ -329,8 +332,10 @@ cd adamsworkflow
 
 Existing files are backed up to `<file>.bak-<timestamp>` before being
 replaced. Re-runs in symlink mode are idempotent — links already pointing
-into this clone are left alone. `CLAUDE_HOME` overrides the `~/.claude`
-target.
+into this clone are left alone. `CLAUDE_HOME` overrides only where
+`install.sh` writes (the `~/.claude` target); Claude Code itself still
+reads `~/.claude` unless you also point `CLAUDE_CONFIG_DIR` at the same
+path.
 
 One thing to be clear-eyed about with `--symlink`: it means my future
 commits edit your live config on your next `git pull`. If you want my
@@ -371,7 +376,10 @@ I just cloned this repo (adamsworkflow). Help me adapt and install it.
    what degrades without each missing one.
 4. Adapt the serving convention and keys to this machine: pages bind
    127.0.0.1 unless I explicitly opt in to a wider interface, and image
-   generation uses my own key or stays text-only.
+   generation uses my own Google credentials — Vertex (GOOGLE_CLOUD_PROJECT
+   + the Vertex AI API enabled + ADC/service-account creds) or
+   GEMINI_API_KEY. Without them, make-it-easy pages build text-only and
+   gen-image exits with a message.
 5. Then install — ./install.sh --symlink or --copy, or a selective copy
    of just the pieces I chose — backing up anything you would replace.
 ```

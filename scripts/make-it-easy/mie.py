@@ -130,10 +130,16 @@ def main():
     elif cmd == "env":
         print(cmd_env())
     elif cmd == "media":
+        if not pos:
+            sys.exit("mie media: missing run dir\nusage: mie.py media <run> [--force]")
         cmd_media(pos[0], force)
     elif cmd == "url":
+        if not pos:
+            sys.exit("mie url: missing run dir\nusage: mie.py url <run> [timeout]")
         cmd_url(pos[0], pos[1] if len(pos) > 1 else 30)
     elif cmd == "wait":
+        if not pos:
+            sys.exit("mie wait: missing run dir\nusage: mie.py wait <run> [timeout]")
         cmd_wait(pos[0], pos[1] if len(pos) > 1 else 86400)
     elif cmd == "list":
         cmd_list()

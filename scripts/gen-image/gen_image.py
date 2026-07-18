@@ -77,7 +77,10 @@ def main():
 
     model = ALIASES.get(a.model, a.model)
     out = os.path.abspath(a.out)
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    out_dir = os.path.dirname(out) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    if not os.access(out_dir, os.W_OK):      # fail before the paid API call, not after
+        sys.exit(f"gen-image: output dir not writable: {out_dir}")
 
     if model.startswith("imagen"):
         if a.ref or a.size:
