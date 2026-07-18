@@ -12,6 +12,36 @@ Current: PHASE 1 COMPLETE (S1–S5 + once-over + fixes + trailer purge). Phase 2
 - Deferred to Adam (skill-manager handoff): codex-runner dispatch-mode contradiction.
   Re-sync of shipped copies follows his skill-manager's report.
 
+## Phase 4 (partial) — docker true-isolation install test (2026-07-18, overnight)
+- ubuntu:24.04, non-root adopter, git-archive transfer (worktree read-only). ALL PASS:
+  fresh --copy (41 files, exclusions honored), backup re-run, --symlink second user +
+  idempotent no-op, keyless make-it-easy smoke (documented skip, no pip/venv,
+  loopback-only listen confirmed from container eth0), bash 5.2 syntax + run.
+- One real bug caught: install.sh printed "(dry-run)" on EVERY run
+  (${DRY_RUN:+} with "0"; pre-existing from v1) — fixed + verified; plus engine
+  .bak-* files leaked into mie run copies via copytree — ignore-pattern added.
+  Both committed (c48f84e), scoped to avoid the concurrent Phase-2 runner's files.
+- Remaining Phase-4 item (needs Adam): live adaptation-prompt test in an
+  authenticated sandbox.
+
+## Phase 2 — README + framing (2026-07-18, overnight)
+- PASS — 7aa6e2e README rewrite (+389/−267, 406 lines, 16 sections), 7c96c3e root
+  CLAUDE.md framing line; conductor-verified on HEAD, gate green, full conductor
+  read done. Bar-check 15/15 (verbatim strings, RESEARCH byte-match, links, zero
+  hype); Fable HN-reader leaf: 24 findings, 19 fixed (incl. symlink trust note,
+  "less-correlated", disarming self-reference line). LOG excerpts: 07-06 stall,
+  07-10 async flip, 07-13 model-by-omission, 07-15 daemon guard, 07-18 scope class
+  w/ 17→0 convergence trajectory. Accepted risks logged in bundle (tagline "etc.",
+  no dollar figure, adaptation prompt labeled pending until Phase 4 live test).
+- Conductor follow-ups committed: c48f84e (docker-test fixes), c09593e (serve
+  examples --bind 127.0.0.1 everywhere; README exception clause dropped).
+- Open one-liner for Adam: a real dual-review catch anecdote would be the
+  highest-leverage single sentence left (review-tiers section).
+
+## Phase 3 — flagship visual (2026-07-18, overnight)
+- Re-invoked page-designer (named agent) to grow the approved design sample into
+  docs/index.html + .nojekyll; conductor commits after review.
+
 ## Stage plan
 - S1 snapshot live config → scratchpad (NEVER committed) + fix-round delta report — opus
 - S2 generalize artifact suite: commands/skills/agents/workflows + xref + codex-parity — fable (parallel w/ S3)

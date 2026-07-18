@@ -6,7 +6,8 @@ How I run Claude Code. The loops, the config, and the devbox. A guide and my ski
 
 A guide, plus the real files it describes: the actual 14 commands, 4 skills,
 4 agent defs, 4 script packages, and 1 workflow I run at `~/.claude/`,
-generalized so someone else can adopt them. The map of what each piece
+generalized so someone else can adopt them. Prefer the one-page visual map?
+[adamjgmiller.github.io/adamsworkflow](https://adamjgmiller.github.io/adamsworkflow/). The map of what each piece
 requires and how it degrades is in [CLAUDE.md](./CLAUDE.md); my global
 config, generalized, is [CLAUDE-global.md](./CLAUDE-global.md).
 
