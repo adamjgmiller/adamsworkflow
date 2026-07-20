@@ -1,19 +1,22 @@
 ---
 name: codex-consult
-description: Run the Codex CLI as a read-only second-opinion engine. Three modes — `review` (diff review with prescribed findings format), `critique` (plan/design/proposal review), `ask` (open question). Use when the user asks for a Codex review, second opinion, or independent take — directly or via /orchestrate's once-over fan-out. Distinct from the `codex:codex-rescue` subagent, which writes code; this skill is read-only and returns structured findings or a written take. Encodes the non-obvious Codex CLI invocation gotchas so the recipe doesn't have to be reinvented.
+description: Run the Codex CLI as a read-only second-opinion engine. Four modes — `review` (diff review, prescribed findings format), `critique` (plan/design/proposal), `ask` (open question), `audit` (file-set sweep for a defined defect class, findings format). Use for any Codex review, audit, or independent take, directly or as the Codex side of review fan-outs. Read-only — never writes code. Encodes the non-obvious Codex CLI gotchas so the recipe isn't reinvented.
 ---
 
 # Codex consult
 
-Run Codex as a read-only second-opinion consultant in one of three modes:
+Run Codex as a read-only second-opinion consultant in one of four modes:
 
 | Mode | Slash form | Codex command | Use case |
 |---|---|---|---|
 | `review` | `/codex-consult review [scope] [focus]` | `codex exec --sandbox read-only` (prompt instructs the diff) | Diff review with prescribed findings format — fits orchestrate dedup |
 | `critique` | `/codex-consult critique <path-or-prose> [focus]` | `codex exec --sandbox read-only` | Read a plan, design doc, or proposal and surface concerns + alternatives |
 | `ask` | `/codex-consult ask <question>` | `codex exec --sandbox read-only` | Open second opinion — "what do you think of approach X?" |
+| `audit` | `/codex-consult audit <targets> [defect-class]` | `codex exec --sandbox read-only` | Sweep named files for a defined defect class — findings format, not diff-scoped |
 
-Read-only. For code-writing, use the `codex:codex-rescue` subagent.
+Read-only. For code-writing, drive Codex write-mode deliberately (`codex exec --sandbox workspace-write`) outside this skill.
+
+> This skill never spawns; leaf-safe only when the parent supplies an explicit mode + scope — the no-args path stops to ask the user.
 
 ## Preflight
 
@@ -30,8 +33,8 @@ Read-only. For code-writing, use the `codex:codex-rescue` subagent.
 2. **Determine mode.** Pick the first match:
 
    - **Explicit token**: `$ARGUMENTS` first token is `review`, `critique`,
-     or `ask` → that mode, with the rest of `$ARGUMENTS` as mode-specific
-     args.
+     `ask`, or `audit` → that mode, with the rest of `$ARGUMENTS` as
+     mode-specific args.
    - **Legacy diff-scope token**: if the first token is `uncommitted`, a
      SHA, or `<base>...<head>`, assume `review` mode with that scope.
      Preserves muscle memory from the old `/codex-review <scope>` form.
@@ -73,10 +76,16 @@ command for the scope:
 | Single commit vs. a base       | `Start by running 'git diff <BRANCH>...<SHA>'.`                               |
 | Multi-commit branch range      | `Start by running 'git diff <base>...HEAD'.`                                  |
 
+(Abbreviated — the mode-specific prompt bodies below are authoritative:
+they additionally have Codex read untracked files for uncommitted scope,
+and embed a literal `A...B` when the caller's range names an endpoint.)
+
 `codex exec --sandbox read-only` reads the working tree
 directly, so it sees uncommitted changes the same way `--uncommitted`
 would have. The `exec` parser also handles `-c key=value` cleanly if
-a config override is needed (e.g. `-c model_reasoning_effort="xhigh"`).
+a config override is needed (e.g. `-c model_reasoning_effort="xhigh"`;
+on GPT-5.6 models `max` exists above `xhigh` for a targeted
+deepest-pass override).
 
 Use `read-only`, not `workspace-write` or the deprecated alias
 `--full-auto` (which is `workspace-write` under the hood and emits a
@@ -129,6 +138,12 @@ file like `/tmp/codex-current-job`** — that path is global, so two
 concurrent /codex-consult callers would clobber each other's tracker
 and the second to read would tail the wrong job's log. Per-job state
 must stay namespaced by `$JOB_ID` end-to-end.
+
+**Never glob `/tmp/codex-*`** — to find a job, to wait on one, or to
+clean up. Concurrent Claude sessions on the same box share this
+namespace; a glob can read a stranger's log as your result or delete
+a job mid-run (this happened in the field). The `JOB_ID` held in
+conversation context is the only valid handle, including for cleanup.
 
 **Step 1 — launch Codex detached** (one Bash tool call, returns in
 milliseconds):
@@ -273,7 +288,9 @@ construction you cannot wait for it passively.
    now — see gotcha 1):
    - **Uncommitted**: *"Start by running `git status --short && git
      diff && git diff --cached` to see all staged, unstaged, and
-     untracked changes. Review the resulting diff."*
+     untracked changes, then read each untracked file the status
+     listed — the diffs omit new-file contents. Review the full
+     set."*
    - **Single commit (vs. parent)**: *"Start by running `git show
      --stat --patch <SHA>` to see the commit. Review the resulting
      diff."*
@@ -282,7 +299,9 @@ construction you cannot wait for it passively.
      base. Review the resulting diff."*
    - **Branch range**: *"Start by running `git diff <base>...HEAD` to
      see the cumulative diff for this branch. Review the resulting
-     diff."*
+     diff."* (When the caller's scope names an explicit endpoint —
+     `A...B` — embed that literal range, not a rewritten `A...HEAD`:
+     every reviewer must see the same diff.)
 
 4. **Launch and wait** via the gotcha-3 sentinel pattern with
    `<CODEX_COMMAND>` = `codex exec --sandbox read-only "$(cat $PROMPT_FILE)"`.
@@ -363,6 +382,62 @@ to answer."* `codex exec --sandbox read-only` already has filesystem access.
 Launch and wait via the gotcha-3 sentinel pattern, with
 `<CODEX_COMMAND>` set to `codex exec --sandbox read-only "$(cat $PROMPT_FILE)"`.
 
+### `audit` mode
+
+Sweep a named set of files for a defined defect class. Differs from
+`review` (not diff-scoped — the targets are files as they stand, no git
+range) and from `critique`/`ask` (returns per-finding locations and
+severities, not fixed prose sections). This is the recipe audit-style
+consults kept re-deriving — review-fix-loop Lane 2 documents the
+sibling per-decision adaptation — encoded here so it isn't reinvented.
+
+Args after `audit`: one or more file/dir paths (absolute preferred),
+then the defect-class brief — what to hunt for, stated concretely.
+Missing either → stop and ask.
+
+**Prompt body**:
+
+```
+You are auditing the following files for one specific class of defect.
+Read-only — do not propose to write code. Read each file in full.
+
+Files:
+
+  <absolute paths, one per line>
+
+Defect class — hunt specifically for:
+
+<the caller's defect-class brief, as concrete bullets>
+
+Calibration: report only defects with a concretely reachable trigger —
+name the precondition. Do not report style, taste, or hypotheticals
+requiring the text/code to be misread. An empty report is a valid and
+welcome result — do not pad to seem thorough.
+[If iterating: list what was fixed since the prior round, and carry
+forward a "previously rejected — do not re-raise" list.]
+
+Findings as a numbered list, exact shape:
+
+  N. [SEVERITY: critical | high | medium | low | nit] <one-line summary>
+     Location: <file>:<line or section>
+     Finding: <2-4 sentences: the reachable precondition and what goes wrong>
+     Suggestion: <concrete minimal fix, or "needs human judgment">
+
+If a file is clean for this class, say so explicitly. After the list, a
+short "Notes" section for anything you could not verify confidently.
+```
+
+Launch and wait via the gotcha-3 sentinel pattern, with `<CODEX_COMMAND>`
+set to `codex exec --sandbox read-only "$(cat $PROMPT_FILE)"`.
+
+**Fix-and-re-audit loops** (the common use): each round is a fresh
+detached launch with an updated prompt — name the fixes applied since
+the prior round so Codex checks them for knock-ons instead of
+re-finding them, keep the do-not-re-raise list growing, and stop on an
+empty (or meaningless-only) round. The caller validates every finding
+against the actual files before fixing — Codex proposes, the caller
+disposes.
+
 ## Run and capture
 
 1. Compute `JOB_ID=$(date +%s)-$$-$RANDOM`. The launch step echoes this
@@ -378,9 +453,47 @@ Launch and wait via the gotcha-3 sentinel pattern, with
    reissue it — the sentinel file makes polling resumable.
 5. Once the sentinel exists, check the exit code in
    `/tmp/codex-done-$JOB_ID.flag` and read
-   `/tmp/codex-out-$JOB_ID.log`. Surface findings/take to the
-   conversation. For `review`, preserve the numbered findings format.
-   For `critique`/`ask`, preserve Codex's section structure.
+   `/tmp/codex-out-$JOB_ID.log`. **In every mode**, Codex's actual
+   answer is the block from the *last* `^codex$` marker line to the
+   `^tokens used$` line — everything before is banner, reasoning, and
+   tool output (the diff Codex ran, web searches); everything after the
+   token count is a verbatim echo of the same answer. This holds for all
+   modes because the marker is a property of `codex exec` output,
+   not the prompt. Extract it with:
+
+   ```bash
+   ANSWER=$(awk '/^codex$/{cap=1; blk=""; next} /^tokens used$/{cap=0} \
+        cap{blk=blk $0 ORS} END{printf "%s", blk}' "$LOG_FILE")
+
+   if [ -n "$(printf '%s' "$ANSWER" | tr -d '[:space:]')" ]; then
+     printf '%s\n' "$ANSWER"                      # the review/critique/ask body
+   else
+     # Empty extraction → fall back to the raw log, but log WHY first. A blank
+     # result is a *symptom* (non-zero exit, a Codex error page, or a future CLI
+     # changing the marker format), not proof the awk is wrong — it has been
+     # misdiagnosed as a `$0`-drop bug when the awk was fine. Record the exit,
+     # marker presence, and byte count so the real cause is legible:
+     grep -qxE 'codex[[:space:]]*'       "$LOG_FILE" && M1=y || M1=n
+     grep -qxE 'tokens used[[:space:]]*' "$LOG_FILE" && M2=y || M2=n
+     echo "codex-consult fallback: $(cat "$DONE_FILE" 2>/dev/null) codex_marker=$M1 tokens_marker=$M2 bytes=${#ANSWER} — reading raw log $LOG_FILE"
+     cat "$LOG_FILE"
+   fi
+   ```
+
+   The awk captures the block from the *last* `^codex$` marker to
+   `^tokens used$`, yielding review/audit findings, critique sections, or
+   ask sections cleanly and avoiding the trailing duplicate echo. The awk
+   program must stay a **single-quoted** shell string — double-quoted, the
+   shell expands `$0` to the shell name before awk runs, and the
+   extraction comes back empty (silently under bash, an awk fatal under
+   zsh), reproducing the false `$0`-drop diagnosis above. **Don't fall
+   back silently** — the empty branch prints its reason so a downstream
+   reader pins the real cause instead of guessing: `codex_marker=n` /
+   `tokens_marker=n` means the CLI changed the marker format (verified
+   intact at v0.142.5; originally v0.136.0), and a non-`exit=0` sentinel
+   means Codex itself errored. Surface findings/take to the conversation:
+   for `review`, preserve the numbered findings format; for `critique`/`ask`,
+   preserve Codex's section structure.
 6. Clean up temp files (substitute the same `JOB_ID` literal you used
    for the wait step — only delete this job's files, never anything
    shared):
@@ -396,11 +509,14 @@ If Codex's exit code is non-zero, or the log is empty / clearly
 truncated, say so plainly — do not invent findings or paper over the
 failure.
 
-## When invoked as a Codex runner (from `/orchestrate`, `/quick-dual-review`, etc.)
+## When invoked as a Codex runner (from `/orchestrate`, `/pr-auto-review`, etc.)
 
-`/orchestrate`'s post-execution once-over and `/quick-dual-review` both
-dispatch a `general-purpose` sub-agent that follows this skill against
-a parent-supplied diff scope. The sub-agent's role in this context is
+`/orchestrate`'s post-execution once-over and `/pr-auto-review`'s
+per-lens reviewers dispatch a runner sub-agent **foreground** — the named
+`codex-runner` def (`~/.claude/agents/codex-runner.md`), or a
+`general-purpose` sub-agent briefed to follow this skill — against a
+parent-supplied diff scope. (`/dual-review` does not dispatch a runner;
+it drives this skill inline.) The sub-agent's role in this context is
 **Codex runner**, not reviewer: the decision to consult Codex was
 already made by the parent. **Skipping is a failure mode, not an
 optimization.** Do not skip based on diff triviality, perceived
@@ -411,7 +527,7 @@ defeats the dedup/divergence logic the parent is built around.
 That sub-agent should:
 
 1. Read this SKILL.md (it's the source of truth, not the orchestrate or
-   dual-review doc).
+   pr-auto-review doc).
 2. Run in **`review` mode** with the scope the parent provided
    (typically `<merge-base>...HEAD` for branch-range, or `uncommitted`).
    Do not redetect scope — use what the parent passed.

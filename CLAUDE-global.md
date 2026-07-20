@@ -1,0 +1,121 @@
+# CLAUDE-global.md — a generalized global config
+
+> **What this is.** My real global `~/.claude/CLAUDE.md`, generalized for adoption: personal infrastructure removed, and my standing authorization grants converted into descriptions you can choose to make for yourself (see "Authorization grants" below). It is written the way a global CLAUDE.md has to be written — as the config owner ("I"/"me") addressing their Claude — so the sections work as-is once merged.
+>
+> **How to adopt it.** Merge the sections you want into your own `~/.claude/CLAUDE.md`, selectively — each section stands alone. Or hand this file to your Claude and ask it to merge the sections that fit your setup. Model tier names (Fable > Opus > Sonnet > Haiku) mean strongest → cheapest; map them onto whatever tiers you actually run.
+>
+> Generalized from the live config on 2026-07-18. The live original keeps evolving through the **Config feedback** loop below — which is why it comes first.
+
+# Config feedback
+
+*(Placed first on purpose: this is the section that keeps every other section — and every command, skill, and agent that travels with this file — improving instead of rotting. Everything else here is a snapshot; this is the mechanism.)*
+
+At the end of a turn — and as a sweep at the end of a session, phase, or project — surface any change to the config that governs agents that would make future agents more efficient or effective. This spans both **problems** (a missing, ambiguous, wrong, or stale instruction in user- or project-level CLAUDE.md or related docs; a broken or confusing skill, command, sub-agent, plugin, or hook) **and plain improvements** (a clearer instruction, a useful convention or note, a sharper skill/command interface, a capability worth adding — even when nothing broke). Say it in one line: name the exact target and the specific change. **Bar:** it must be grounded in something you actually hit or noticed this session, concrete enough to act on, and worth the change — not speculative or trivial. Don't edit config unless I approve.
+
+# Build System
+
+For a meaningful change in a repo — more than a quick edit — run the Build System skill: docs sized to the work (PRD + Plan for large/ambiguous; a single Spec for medium; neither for small) → Build → Draft PR → Final Review, autonomous by default, with adversarial Codex + sub-agent review loops at each gate. Invoke `/build-system` (or let it trigger on substantial build requests). It writes PRD/PLAN/SPEC/JOURNAL to the `plans/` layout and owns planning while engaged.
+
+# Choosing the vehicle (work intake)
+
+- Trivial edit / pure Q&A → just do it inline.
+- Staged execution of a plan — one exists or you'll write one; no docs/PR ceremony needed → `/orchestrate`.
+- Meaningful repo change from a raw request → `/build-system` (owns docs → build → PR; see its tiering).
+- GitHub issues to resolve, or an existing PR to review/ship → `/ship-issues` (PR-stage review + fix + promote: `/pr-auto-review`; PR behind main: `/auto-merge-main`).
+- Non-code or mixed deliverable (research, proposal, brand, docs) wanting a bespoke team + judge → `/teamwork`.
+- Long unattended goal that must not stop for questions → `/auto-run <goal + methodology>`.
+- Batch decisions/questions for me → `/make-it-easy` (walkthrough page) or `/askme` (inline); stress-test a plan with me → `/grill-me`.
+
+**Review tiers** (one shared finding format, severity `critical|high|medium|low|nit`):
+`/quick-review` = one Claude pass (cheapest; needs no Agent tool — inline for leaves and others' work, one fresh-eyes sub-agent when reviewing its own session's edits and it can spawn) → `/dual-review` = + one detached Codex, deduped (leaf-safe) → `/lens-review` = per-lens Opus+Codex fan-out, read-only (widest). Loop any of them with `/review-fix-loop <cmd>` — fix, re-review, stop on convergence/steady-state/regression (default cap 5 rounds, 3 when wrapping `/lens-review` — convergence to no meaningful findings is the goal; the cap is the cost guard). PR-bound review + fix + promote → `/pr-auto-review`. Default lens-review breadth for non-trivial or risky diffs, dual-review for light passes; when unsure, lean thorough.
+
+# Authorization grants (decide your own)
+
+My live config carries two standing grants that are deliberately **not** reproduced here as instructions, because only you can make them for your own repos and accounts. The pattern, described so you can decide:
+
+- **Pushing feature branches.** The owner pre-authorizes autonomous slash commands to push feature branches to remote without pausing to ask — while keeping hard floors that no grant overrides: never force-push `main`, never commit to `main` directly, never push with `--no-verify`.
+- **Autonomous skills finishing their own PRs.** When the owner invokes a skill whose documented exit is a ready PR, the invocation itself is treated as authorization for that skill's *documented deliverable actions* — e.g. promoting the owner's own draft PR to ready once convergence conditions are met, or posting the skill's own review-summary comment. The principle: judge each leaf action against the contract of the skill that was invoked, not in isolation. The grant stays bounded to **reversible** actions on repos the owner controls, with hard exclusions that always require asking first: repos outside the owner's control, merging, force-pushing `main`, `--admin`/`--no-verify`, external communications to people outside the session, deleting data outside the repo, deploys, real spend.
+
+If you want either behavior, write the grant in your own words in your own CLAUDE.md. Nothing in this file grants it — without your explicit grant, the default remains: push and publish only when asked.
+
+# Changing code
+
+**Before you write** — trace the blast radius of any change (fix, feature, refactor):
+
+1. **Every writer**: find every place the thing you're changing can be set or produced, across its full range of values and states.
+2. **Every consumer**: find every caller or reader of the code you're touching.
+3. **Parallel code paths**: when adding code that mirrors an existing path, diff the two — ordering differences, missing steps, and divergent conventions are bugs.
+4. **Full implementation, not just signatures**: read the body of any function you call — signatures hide state, ordering, and side effects.
+5. **Fix the class, not the instance**: when you find a bug or pattern in one path, check every path.
+
+**Before you ship** — re-read the actual diff, not your recollection: edge cases, callers and writers you didn't touch, assumptions invalidated mid-execution, plan steps silently scoped out, and stale comments/docstrings near changed behavior (a misleading comment is worse than none). Fix what's fixable in the same turn; if something's genuinely out of scope, call it out. Fold findings into the final report, not a separate artifact. If you'd flag it as a reviewer, fix it now.
+
+# ASCII diagrams
+
+When something has flow, structure, or branching that prose strains to describe — request paths, state transitions, decision trees, before/after refactors, component layouts — reach for an ASCII diagram. Use them to think through decisions, align with me faster in chat, and give future readers a head start in docs and code comments. Skip when prose is already clear. In code comments specifically, reserve them for stable invariants — byte/memory layouts, state machines, orderings — since diagrams rot faster than prose and a wrong diagram is worse than none.
+
+# Communication visuals
+
+A substantial HTML page built to communicate with me — report, deep-dive, walkthrough, comparison, proposal page — is delegated to the `visual-builder` agent (`~/.claude/agents/visual-builder.md`; it starts from the shared scaffold in `~/.claude/scripts/visual-page/`), not built inline by the main agent. Out of scope: decision batches (→ `/make-it-easy`); a quick ASCII diagram or short snippet in chat stays inline; and any visual that is part of a project/app deliverable (product UI, site pages, in-repo assets) — visual-builder and `/visual` are for agent↔me communication only, never project output.
+
+**Model — pass it explicitly on every dispatch** (the def deliberately carries no pin): Opus normally · Sonnet when genuinely simple (a table and a few short sections) · Fable only when the material is complex AND a subtle misstatement is costly — the delegation policy's escalation test, instantiated. The Sub-agent delegation ceiling applies in full — never above the session tier, so Fable appears only when the session is Fable or I name it; this is NOT a role-pin exception like make-it-easy. My explicit instruction always overrides the tiering, in either direction. (Grounded 2026-07-04: same page built both ways — Opus hit ~90–95% of Fable; design better, fidelity slightly lower, one briefing-hop conflation.)
+
+**The brief must be payload-complete**: every fact, number, quote, and diff the page will show goes in the brief (or a handoff file written first) — "read X and figure it out" is where delegation fidelity dies. If the page IS the synthesis, do the synthesis first, then delegate only the assembly. After the build, spot-check the page's load-bearing claims against the brief (the observed failure mode is plausible misattribution, not bad design), then serve it yourself per the serving rule below.
+
+**Carve-out — permanent/critical reference pages** (grounded 2026-07-05: a when-to-use-which guide): when the page is a long-lived reference to my own system and the content was synthesized in-session, the briefing hop is the dominant risk — build it inline as the main agent (reusing the visual-page design system), or recommend that. Routine communication pages stay delegated.
+
+# Preview servers & teardown
+
+When you start a server for me to preview (web app, static files, screenshot host, generated report — anything I might want to open), lead with a clickable URL in chat. By default, serve on 127.0.0.1 (localhost-only). To open pages from other devices, opt in explicitly: bind 0.0.0.0 on a trusted network, or preferably bind a private tailnet/VPN interface (e.g. Tailscale) — see the README's serving section. If a server has no obvious way to bind the interface you need, say so before starting it rather than handing me an unreachable link. Skip all this for servers not meant for me to look at (test runners, internal IPC, sidecars).
+
+**Teardown.** Declare a lifespan when starting any server: **purpose-bound** (the default — name the event that ends it: make-it-easy answers parsed, review decided, PR merged, page superseded) or **keep-alive** (say why). Kill purpose-bound servers as part of completing their purpose — files stay on disk and re-serving is one command, so killing is the cheap, reversible default. At wrap-up (session/phase/project), sweep the servers this session started: purpose-complete → kill; might-revisit (spec pages, guides, proposals) → ask me in one batched line ("still serving: X, Y — keep or kill?") instead of auto-killing or silently leaving them. Never touch another session's servers or anything systemd-managed except on my explicit ask.
+
+**Sharing with a third party** outside your own network is a separate, deliberate step (an ephemeral tunnel or real hosting) — flag the choice explicitly rather than silently exposing a port.
+
+# Sub-agent delegation
+
+Default to delegating when a task has **high intermediate volume but a compact final output** — many reads, greps, edits, or tool calls producing a short answer or bounded diff. The goal is preserving main-context budget, not minimizing total tokens.
+
+**Good fits:** exploratory search ("all callers of X"), bounded research that compresses well, bounded execution against a crisp spec, independent work in parallel (multiple Agent calls in one message), or a whole non-interactive stage/loop — the stage-runner pattern: one sub-agent runs the loop, fans out its own leaves, returns a compact bundle (Task sub-agents can nest, Workflow `agent()` nodes cannot).
+
+**Skip when:** the output itself needs to land in main context; the spec isn't clear yet (delegating unclear work delegates the thinking); briefing + summary overhead exceeds savings; follow-up needs intermediate details; or the work needs tight iteration (UI/UX, mid-flight redirection).
+
+Don't delegate judgment calls — "based on your findings, fix the bug" pushes the decision onto the sub-agent. I decide what and how; the sub-agent carries it out. Read the returned diff in main context and do the once-over there; verify at the edges (tests, diff, spot-checks) without re-reading everything the sub-agent read.
+
+**Model selection for delegation (the policy — command briefs' `model:` notes defer to it).** Effectiveness first; lowest tier that delivers it. Order: Fable > Opus > Sonnet > Haiku.
+
+- **Tier guide — pick by the shape of the work, not its importance.** **Fable** — integrative reasoning at full depth: many constraints held simultaneously, long-range or subtle interactions (cross-system architecture calls, root-causing tangled bugs, adversarial/security judgment where a plausible miss is the threat model), and outputs that will be trusted without cheap verification (permanent reference artifacts, decisions that gate lots of downstream work); Fable-shaped = the failure mode is "confidently, subtly wrong" AND that failure is expensive. **Opus** — the default tier for thinking AND execution: critiques, reviews, fixes, synthesis, planning, conductors, and build/implementation work in general — any meaningful multi-step or multi-file task. **Sonnet** — only when the work is extraordinarily simple and single-unit (editing one page, one function, one config block at a time — never a meaningful build task), plus the two structural rules below (unbounded fan-outs; Codex drivers). **Haiku** — never for project/coding work; its one use case is volume reading — read/skim stages that must ingest hundreds of items and return compressed digests (e.g. the read stage of a research workflow).
+- **The escalation test — when two adjacent tiers are both plausible; applied by the dispatcher holding the item, per item, at dispatch time.** Take the higher tier only when BOTH hold: (1) *hard* — the work sits at the lower tier's reasoning frontier (subtle, adversarial, novel, or deeply cross-cutting), so the lower tier would plausibly come back *almost right*; (2) *costly-if-almost-right* — a subtly-wrong output would propagate silently or be expensive to catch downstream. One prong alone never qualifies: important-but-mechanical stays low (verification catches loud errors cheaply); hard-but-cheap-to-verify stays low (verify instead of escalating). Otherwise take the lower tier — "lowest tier that delivers it," in both directions. A judgment call by design — but judgment against this test, not taste. Both prongs arguable and genuinely on the fence → lean up (my thoroughness tiebreaker).
+- **Scale rider — Fable dispatchers only.** When one delegated runner will carry a really meaty span end-to-end — a whole invariant-dense build merged into a single stage-runner, many strictly-sequential stages, plausibly hundreds of tool calls or a large fraction of a context window (token counts are unguessable up front; judge the shape) — sustained coherence across the span counts as the *hard* prong even when every individual step is straightforward: the failure mode is quiet invariant drift deep into the run, exactly "confidently, subtly wrong." Only a Fable dispatcher may apply this rider — it refines the choice *below* the ceiling, never justifies dispatching above the dispatcher's tier, and a non-Fable conductor doesn't cite it to request escalation. (Grounded 2026-07-05: a single build stage-runner ran past 400k tokens.)
+- **Ceiling.** Never dispatch a child above its dispatcher's tier unless I explicitly ask. The session model is the global maximum — Fable appears only when the session is Fable or I name it. On a Sonnet session even "default Opus" resolves to Sonnet.
+- **Explicit `model:` on every dispatch — omission is not neutral.** An unpinned Agent call inherits the session model, so on a Fable session leaving `model:` off silently escalates the child to Fable with no one applying the escalation test. Pass the tier explicitly on every dispatch; Fable is only ever reached by a per-item escalation-test decision or my naming it — never by omission. Corollary: don't use a fork for work a lower tier should carry — forks always run the session model and ignore overrides. (Grounded 2026-07-13: a Fable session launched 3 Fable explorers for partitioned codebase exploration Opus should have carried.)
+- **Unbounded fan-outs → Sonnet, pinned.** Any stage whose agent count is unknown or large when the model is chosen — per-item validation/verification that could run 20/50/100 agents — is Sonnet, *including* validating the findings of an expensive finder fan-out. Pin it explicitly (`model: 'sonnet'`): unpinned calls inherit the session model, so a validation stage authored from a Fable session silently becomes N Fable agents. Exception: an orchestrator holding the item list before dispatch may size per-list — the rule is hard only where the count can't be known in advance.
+- **Bounded, known-up-front fan-outs may run expensive tiers** — 8 deliberately-chosen Fable/Opus review finders is fine.
+- **Mechanical Codex drivers → hard Sonnet, always** (the `codex-runner` agent, any `codex-consult` leaf, a Workflow codex node): no Claude reasoning worth more — never let one inherit Opus/Fable. (On a Sonnet/Haiku session, Sonnet is also the driver's floor — on a Haiku session this floor deliberately overrides the ceiling.)
+- **Exploration/search/read-only research leaves → default Opus** (Sonnet for a single mechanical lookup). Per-item Fable only via the escalation test — well-partitioned surface areas whose findings get cross-checked in main context fail the *hard* prong; Fable exploration is for when the map itself is the tangled part (e.g. root-causing across systems where a plausibly-wrong map silently poisons the plan).
+- **Real-reasoning leaves (critiques, opinions, review/fix agents, per-lens reviewers) → default Opus; escalate per item.** Escalate a *given item* to Fable only when it passes the escalation test — decided per-item/per-lens, never one blanket tier for a batch (a critical security lens may warrant Fable while a style lens stays Opus in the same fan-out).
+- **Mid-tree conductors (stage-runners, per-PR/per-issue agents, resolvers, planners) → default Opus, capped at session tier; escalate only per the escalation test.** A conductor is orchestration, not the reasoning-worthy work — don't auto-Fable it because the session is Fable. Because of the ceiling, dispatch a conductor at ≥ the highest tier any of its children may need: to allow per-lens Fable escalation, deliberately dispatch that fan-out's conductor at Fable. Net: nothing runs Fable unless the escalation test (or a Fable session at the top) put it there.
+- **`make-it-easy` stays hard-pinned Opus** (design/curation/writing; its own frontmatter) — the standing role-pin exception to the ceiling (it holds Opus even under a Sonnet main loop).
+- **`visual-builder` is deliberately NOT pinned** — the dispatcher passes the model per the Communication visuals section (Opus normally · Sonnet trivial · Fable complex+critical), always under the ceiling; my explicit override wins.
+
+**Briefing dispatched agents** — anchor the cwd in every brief: a dispatched agent starts in the *dispatcher's* cwd (which may be a worktree) but resets to it on **every** Bash call — a cwd set via `cd` does NOT persist to the next call (root cause + provenance: `~/.claude/docs/field-notes.md` §2). Prefer absolute paths / `git -C <abs>` everywhere; a relative flow works only when `cd <dir> && <cmd>` is folded into a *single* call. Wrong-tree git ops look plausible via the shared object store while editing the wrong checkout. Sub-agents have no `AskUserQuestion` tool — never brief one to "ask the user"; human decisions come back packaged as data (question, options, recommendation, state) for the main loop to surface. A named agent's (`name:`, for SendMessage addressability) leaf dispatches run SYNCHRONOUS — each blocks until the child returns, result inline (field-notes §4, probed 2026-07-15) — so it can fan out and collect, but assume serially: keep a named agent's own fan-outs small and run wide concurrent fan-outs unnamed. A named agent's final plain-text turn still doesn't surface reliably — SendMessage as its final act; file handoff stays the belt-and-braces (name it outside the blocked `REPORT/SUMMARY/FINDINGS/ANALYSIS*.md` basename family — a subagent Write guard refuses those; field-notes §4). Uncommitted edits don't push — if a delegated path applies fixes, say who commits and when, and prefer committing (or isolating the agent in its own worktree) over handing back a dirty shared tree. Reusable agent defs live in `~/.claude/agents/` (`stage-runner`, `codex-runner`, `make-it-easy`, `visual-builder`) and load at session start, so a def created mid-session needs a fresh session (field-notes §9). Nesting depth stays within ~3–4 levels (field-notes §5).
+
+# Worktrees
+
+`EnterWorktree` cannot *create* a worktree while the session is already in one (probed 2026-07-02). Chain worktrees with: `git worktree add <main-repo>/.claude/worktrees/<name> -b <branch> origin/<default>`, then `EnterWorktree` with `path`.
+
+# Plan artifacts (`plans/`)
+
+Maintain `plans/<branch>.md` at the repo (or worktree) root as the branch's umbrella record — a concise log of planned/considered/decided/executed plus an index of any linked PRD/SPEC/PLAN/JOURNAL. Applies in a linked git worktree (`git rev-parse --git-common-dir` ≠ `--git-dir`) and in any repo while the Build System is engaged.
+
+**Layout** — flat in `plans/`, branch prefix with `/` → `-` (`feat/auth-rewrite` → `feat-auth-rewrite`): `plans/<branch>.md` (umbrella, always present), plus role sidecars created only when warranted (`-PRD.md` / `-PLAN.md` / `-SPEC.md` / `-JOURNAL.md` / `-DECISIONS.md` / `-PREEXISTING.md`). If `plans/<branch>.md` already exists (branch reused across worktrees), append `-2`/`-3` to the branch portion; if a doc is revised mid-build, append `-v2`/`-v3` to the role and keep the old version.
+
+**Umbrella file** — frontmatter: branch, base, started; body lightweight, no rigid template. Create on first session in a worktree (or when the Build System engages) with a metadata stub (Goal `_TBD_`), filling Goal in as intent emerges; read at session start before substantive work whenever one exists; update proactively on meaningful events (decisions, docs created/revised, scope changes, dead-ends), not trivial edits.
+
+**Commit & review** — commit all of them; they merge to main with the branch and appear in PR diffs, where review passes treat them as reviewable artifacts. Never gitignore or stash them before review.
+
+**Migrating existing projects** — if a project has non-conforming plan-like files (root `PLAN.md`, `notes/`, `docs/decisions/`), surface them and ask whether to (1) reorganize into `plans/<branch>-*`, (2) move to `plans/old/` and start fresh, or (3) leave as-is and apply only to new branches. Don't migrate without explicit direction.
+
+# Config sync
+
+I sync my config across machines with a dotfiles manager.

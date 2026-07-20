@@ -1,9 +1,9 @@
 ---
-description: Pursue a goal autonomously — play the human for any nested command that would normally pause for input, log every such decision, escalate tough calls to /quick-dual-review, and pause only for critical-irreversible actions.
-argument-hint: <goal text, possibly referencing other commands like /orchestrate, /adamsreview:review>
+description: Pursue a goal autonomously — play the human for any nested command that would normally pause for input, log every such decision, escalate tough calls to /dual-review, and pause only for critical-irreversible actions.
+argument-hint: <goal text, possibly referencing other commands like /orchestrate, /pr-auto-review>
 ---
 
-You've been invoked with `/auto-run`. The goal — and any nested commands the user wants applied as methodology — are in `$ARGUMENTS`. Your job: deliver the goal end-to-end without asking clarifying questions, by **playing the human** for any nested command that would otherwise pause for input. Every such decision goes in a decision log; tough calls get a `/quick-dual-review` second opinion first. The user is normally away — assume hours of autonomous runway, not minutes.
+You've been invoked with `/auto-run`. The goal — and any nested commands the user wants applied as methodology — are in `$ARGUMENTS`. Your job: deliver the goal end-to-end without asking clarifying questions, by **playing the human** for any nested command that would otherwise pause for input. Every such decision goes in a decision log; tough calls get a `/dual-review` second opinion first. The user is normally away — assume hours of autonomous runway, not minutes.
 
 This runs in `bypassPermissions`/auto mode. The user will have pre-granted what they expect in the goal text. Hit a permission gap you can't work around → skip + log + continue (see "Permission gaps").
 
@@ -11,8 +11,8 @@ This runs in `bypassPermissions`/auto mode. The user will have pre-granted what 
 
 ## Triage (do this first, in one short response)
 
-1. **Read `$ARGUMENTS`.** Identify: the goal (1-2 sentence summary), the nested methodology commands (`/orchestrate`, `/adamsreview:review`, `/quick-dual-review`, etc.), and any explicit overrides (e.g., "push and open a PR" overriding `/orchestrate`'s "no push" rule).
-2. **Pick paths.** `git rev-parse --git-dir` succeeds → use `plans/<branch>-*` per the user's CLAUDE.md convention. Not a git repo → fall back to `./auto-run-<short-topic>/{umbrella,journal,decisions}.md`. State the paths.
+1. **Read `$ARGUMENTS`.** Identify: the goal (1-2 sentence summary), the nested methodology commands (`/orchestrate`, `/pr-auto-review`, `/dual-review`, etc.), and any explicit overrides (e.g., "push and open a PR" overriding `/orchestrate`'s "no push" rule).
+2. **Pick paths.** `git rev-parse --git-dir` succeeds → use `plans/<branch>-*` per the global CLAUDE.md plan-artifacts convention (see `CLAUDE-global.md` in this repo). Not a git repo → fall back to `./auto-run-<short-topic>/{umbrella,journal,decisions}.md`. State the paths.
 3. **If resuming** (the three files already exist for this branch): read umbrella → cursor → last ~10 DECISIONS → last ~10 journal entries. Don't replan. Resume from cursor.
 4. **If fresh**: write the umbrella with goal verbatim, methodology commands list, permission grants the user pre-authorized, explicit nested-command overrides, and a `Cursor` line.
 5. **Announce in one sentence**: *"Auto-running: <goal>; methodology: <commands>; state at `plans/<branch>-*.md`; starting."* Then begin — no plan-and-wait.
@@ -22,6 +22,10 @@ This runs in `bypassPermissions`/auto mode. The user will have pre-granted what 
 When a nested command would normally `AskUserQuestion`, wait at `ExitPlanMode`, or pause for any interactive checkpoint (promote vs skip, scope tier, "Accept all / Pick subset / Walk each", "fix or defer", plan approval, "should I proceed?"):
 
 **Do not dispatch the AskUserQuestion.** Make the call yourself, using one of three escalation tiers.
+
+**Nesting vs. interactivity.** Dispatched sub-agents carry no `AskUserQuestion` tool at all (`~/.claude/docs/field-notes.md` §3) — only this main loop can reach the user. Keep AskUserQuestion-driven and live-context steps here: **Tier-3-reachable work stays in the main loop; only Tier-1/Tier-2-bounded work may be handed to a nesting stage-agent.** A sub-agent that hits a user-question returns it as **data** — the pending question, the options, its recommendation — it must not resolve it and must not hang. Triage whatever comes back through these same three tiers: Tier 1/2 you answer yourself (that is this command's whole job); Tier 3 still reaches the real user.
+
+**Composition with escalating conductors.** Conductors built on the escalate-don't-resolve contract (a delegated stage returning a packaged human-decision instead of asking) compose with this command — they don't bypass it. Run *under* `/auto-run`, the packaged decision such a conductor would surface via AskUserQuestion lands in this loop and gets the same triage: Tier 1/2 decided and logged here; Tier 3 (critical-irreversible) still pauses for the user — the Tier 3 AskUserQuestion, or `/askme` to batch several.
 
 ### Tier 1 — Routine (decide directly)
 
@@ -34,7 +38,7 @@ Log a 3-5 line entry to `DECISIONS.md`.
 
 ### Tier 2 — Tough call (dual-review first)
 
-Escalate to `/quick-dual-review` when **all three** hold:
+Escalate to `/dual-review` when **all three** hold:
 
 1. **Shapes the deliverable meaningfully** — architecture, scope, behavior, API contract. Not naming/formatting/defaults.
 2. **Real ambiguity** — two or more options a thoughtful reviewer could defend. "Slightly prefer A" doesn't count.
@@ -42,9 +46,11 @@ Escalate to `/quick-dual-review` when **all three** hold:
 
 Then:
 
-1. Dispatch `/quick-dual-review` against the scoped diff. For pre-code decisions (architectural forks before any diff exists), dispatch dual reviewers manually via Agent — one `general-purpose` Claude reviewer + one `general-purpose` reviewer following `~/.claude/skills/codex-consult/SKILL.md` in `critique` mode against the candidate options.
+1. Dispatch `/dual-review` against the scoped diff. (Dual-review is leaf-safe — needs no `Agent` tool; its Claude side honors quick-review's fresh-eyes rule, so reviewing edits this agent itself authored (a delegated child's edits don't count) from an Agent-holding context dispatches one fresh sub-agent for that pass; expect the `concurrent single-process dual-source` report label, or `single-source` if Codex is unavailable.) For pre-code decisions (architectural forks before any diff exists), dispatch dual reviewers manually via Agent — one `general-purpose` Claude reviewer (`model: opus`/`fable` per the model-selection policy) + one `general-purpose` Codex-driver reviewer (`model: sonnet`) following `~/.claude/skills/codex-consult/SKILL.md` in `critique` mode against the candidate options.
 2. Read both verdicts. **Converged** → take it. **Diverged** → you make the call, *and* log the divergence + your rationale so the user can sanity-check at the end.
 3. Log the verdicts in the DECISIONS entry.
+
+**Keeping the volume out of main context:** you MAY hand step 1 to one review-coordinator sub-agent (`general-purpose` — it needs the `Agent` tool to dispatch the manual pre-code pair; dual-review itself needs none; brief it to collect both of that pair's completion task-notifications before returning — async dispatch; field-notes §4) (it runs the `/dual-review` — or the manual pre-code pair — and returns the bundle). Its return contract must preserve the **divergence signal: both verdicts, any diverged takes verbatim, and each side's rationale** — never a flattened "reviewers agree on A". Steps 2-3, the DECISIONS divergence log, and the close-out's consequential-decisions surfacing all read that signal; a coordinator that collapses it silently drops this command's highest-value flags.
 
 ### Tier 3 — Critical and irreversible (pause for user)
 
@@ -54,11 +60,12 @@ The narrow exception. Only when guessing wrong would cause real-world harm that 
 - Force-pushing a shared branch (main/master, anything publicly tracked)
 - Deleting/dropping data outside this repo (databases, prod state, cloud resources, paid infra)
 - Opening PRs to repos outside the user's control
+- Merging a PR — even in the user's own repo — unless the goal text explicitly directs that merge (the goal-overrides rule below then applies)
 - Spending real money beyond what the goal pre-authorized
 
 For those: dispatch `AskUserQuestion` and **wait**. Log both the pause and the user's answer in DECISIONS. Treat the answer as authoritative for this run only.
 
-**What is *not* in Tier 3**: anything reversible via git (commits, branches, local file changes, `:fix` promotions, walkthrough tier picks, pushing your *own* feature branch, opening PRs in the user's own repos). Those are normal autonomy.
+**What is *not* in Tier 3**: anything reversible via git (commits, branches, local file changes, fix promotions, walkthrough tier picks, pushing your *own* feature branch, opening PRs in the user's own repos). Those are normal autonomy.
 
 ## Permission gaps
 
@@ -70,19 +77,19 @@ In bypass-permissions, denials should be rare. When one happens:
 
 ## No simplification — execute the requested flow honestly
 
-If the goal calls for `/adamsreview:review`, run `/adamsreview:review`. **Do not** substitute `/quick-dual-review` or any lighter alternative because it's cheaper, faster, or easier on context. The user picked the flow on purpose. **A long, token-heavy run that honestly executes the requested flow is the success criterion — not minimizing cost.**
+If the goal calls for `/lens-review`, run `/lens-review`. **Do not** substitute a narrower review (e.g. `/dual-review`) for the one the goal names, to save tokens, time, or context. The user picked the flow on purpose. **A long, token-heavy run that honestly executes the requested flow is the success criterion — not minimizing cost.**
 
 The only allowed substitution: the requested tool is genuinely unavailable (plugin uninstalled, `codex` not on `PATH`). Then: log "Intended X, ran Y because X unavailable; impact: ...".
 
 ## Goal overrides nested-command rules
 
-Nested commands may have prohibitions: `/orchestrate`'s "never push or open a PR without explicit approval", `/adamsreview:review`'s git-op restrictions, etc. **If the goal explicitly directs the prohibited action, the goal wins.** Note the override in the umbrella up-front *and* in the journal entry where you act on it.
+Nested commands may have prohibitions: `/orchestrate`'s "never push or open a PR without explicit approval", `/dual-review`'s review-only disposition, etc. **If the goal explicitly directs the prohibited action, the goal wins.** Note the override in the umbrella up-front *and* in the journal entry where you act on it.
 
 ## Durable state (three files, written as you go)
 
 ### `plans/<branch>.md` — umbrella
 
-Per the user's CLAUDE.md convention. Frontmatter: branch, base, started. Body:
+Per the global CLAUDE.md plan-artifacts convention. Frontmatter: branch, base, started. Body:
 
 - **Goal** — verbatim from `$ARGUMENTS`
 - **Methodology** — list of nested commands
@@ -133,11 +140,12 @@ Whenever working memory feels unfamiliar (a compaction telltale), or at session 
 ## Working rules
 
 - **Delegate as `/orchestrate` does** — sub-agents do per-step work; orchestrator holds coordination, decision-making, and reconciling-against-diff. Brief each sub-agent like a smart colleague who just walked in (full context + the goal-as-north-star where relevant).
+- **Nested delegation (auto-run-local override)** — a delegated stage MAY spawn one bounded second level of its own children (`general-purpose` Task-fabric sub-agents can spawn — `Explore`/`Plan` types cannot; field-notes §1 — the `stage-runner` def at `~/.claude/agents/stage-runner.md` carries the contract). Brief every nesting stage to count its child dispatches and collect every child's completion task-notification before advancing (dispatches are async-only; completions re-wake a stopped parent — field-notes §4). Stay within the ~3-4-level depth convention (field-notes §5). Budget honestly: nesting multiplies the parallel-work rule below, so the real concurrent-agent count is the **sum** of your own parallel dispatches plus every nested child they spawn — sum it before dispatching and keep it modest (field-notes §6). Tier-3-reachable work never gets delegated at all — see "Play the human". Brief every delegated stage to return a decisions digest (decision, options, choice, rationale) for any call that would have been a user prompt; on return, transcribe each entry into DECISIONS.md (marked 'decided in <stage> stage-agent') before moving on.
 - **Reconcile against truth** — sub-agent reports describe *intent*; the diff is *truth*. If a reported change isn't in the diff, re-dispatch. Don't advance on phantom work.
 - **Spot-check before commit** — read the diff. If it doesn't match the dispatch brief, redo or repair before committing.
 - **Plan mode** — exit immediately on entry.
 - **Never weaken a verify silently.** Skipping a check and logging it to DECISIONS is fine when the alternative is hours stuck on a tangent. Silently lowering the bar is not.
-- **Parallel work where safe** — multiple Agent tool-uses in one message when stages are independent.
+- **Parallel work where safe** — multiple Agent tool-uses in one message when stages are independent; count any nested children toward the same concurrent-agent sum (see "Nested delegation" above).
 
 ## Closing protocol
 

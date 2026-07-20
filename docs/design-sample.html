@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>adamsworkflow — design sample</title>
+<meta name="description" content="How I run Claude Code. The loops, the config, and the devbox.">
+<script>
+/* Set theme before first paint to avoid a flash. Honor stored choice,
+   else the OS preference. CSS keeps a no-JS fallback via media query. */
+(function () {
+  try {
+    var t = localStorage.getItem('aw-theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+<style>
+/* ---------------------------------------------------------------------------
+   adamsworkflow — design-direction sample
+   Aesthetic: typeset engineering manual. Serif + monospace only.
+   Warm-neutral monochrome "paper". Hairline ruler rules. One restrained
+   proofreader's-red accent, used sparingly.
+   --------------------------------------------------------------------------- */
+
+/* ---- Tokens -------------------------------------------------------------- */
+:root {
+  --serif: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype",
+           Palatino, "Book Antiqua", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono",
+          "Cascadia Code", Consolas, "Liberation Mono", monospace;
+
+  /* light — paper */
+  --paper: #FBFBFC;
+  --raise: #F1F2F4;
+  --ink: #17181A;
+  --ink-soft: #4F535A;
+  --ink-faint: #6E737B;
+  --hair: #DFE1E5;
+  --hair-strong: #C1C4CB;
+  --accent: #C23A25;
+  --accent-line: rgba(194, 58, 37, .30);
+  --accent-wash: rgba(194, 58, 37, .07);
+
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --paper: #0E0F11;
+  --raise: #16181B;
+  --ink: #E8EAED;
+  --ink-soft: #9BA1A9;
+  --ink-faint: #767B84;
+  --hair: #24262B;
+  --hair-strong: #35383E;
+  --accent: #E56A54;
+  --accent-line: rgba(229, 106, 84, .34);
+  --accent-wash: rgba(229, 106, 84, .08);
+
+  color-scheme: dark;
+}
+/* no-JS OS fallback */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --paper: #0E0F11; --raise: #16181B; --ink: #E8EAED;
+    --ink-soft: #9BA1A9; --ink-faint: #767B84; --hair: #24262B;
+    --hair-strong: #35383E; --accent: #E56A54;
+    --accent-line: rgba(229,106,84,.34); --accent-wash: rgba(229,106,84,.08);
+    color-scheme: dark;
+  }
+}
+
+/* ---- Reset / base -------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: oldstyle-nums;
+}
+/* faint print grain for tactile depth */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .5;
+  mix-blend-mode: multiply;
+  /* greyscale grain (feColorMatrix saturate 0) — no warm/color cast */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] body::before { mix-blend-mode: screen; opacity: .35; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 68px); }
+main, header, footer { position: relative; z-index: 1; }
+
+a { color: inherit; }
+
+/* mono utility */
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.kicker {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ---- Ruler rule (signature motif) --------------------------------------- */
+.ruler {
+  height: 13px;
+  border: 0;
+  margin: 0;
+  background-image:
+    repeating-linear-gradient(90deg, var(--hair-strong) 0 1px, transparent 1px 60px),
+    repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 12px);
+  background-size: 100% 13px, 100% 7px;
+  background-position: bottom left, bottom left;
+  background-repeat: repeat-x, repeat-x;
+  border-bottom: 1px solid var(--hair-strong);
+}
+
+/* ---- Top bar ------------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--paper);
+  border-bottom: 1px solid var(--hair);
+}
+.topbar-in {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 54px;
+}
+.brand {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand .slash { color: var(--accent); }
+.topnav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.topnav a {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+  transition: color .18s, border-color .18s;
+}
+.topnav a:hover { color: var(--ink); border-color: var(--accent); }
+.topnav .n { color: var(--accent); margin-right: 5px; }
+
+/* theme toggle */
+.toggle {
+  position: relative;
+  width: 54px; height: 28px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--hair-strong);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.toggle .knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent);
+  transition: transform .26s cubic-bezier(.4,.1,.2,1);
+}
+:root[data-theme="dark"] .toggle .knob { transform: translateX(26px); }
+.toggle svg { position: absolute; top: 6px; width: 16px; height: 16px;
+  stroke: var(--ink-faint); fill: none; stroke-width: 1.4; }
+.toggle .i-sun { left: 5px; }
+.toggle .i-moon { right: 5px; }
+@media (prefers-reduced-motion: reduce) { .toggle .knob { transition: none; } }
+
+/* ---- Hero ---------------------------------------------------------------- */
+.hero { padding: clamp(48px, 8vw, 96px) 0 0; }
+.hero .kicker { display: block; margin-bottom: 26px; }
+.hero h1 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(2.5rem, 6.2vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 0;
+  max-width: 15ch;
+}
+.hero h1 em { font-style: italic; }
+.hero .lede {
+  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  line-height: 1.4;
+  color: var(--ink-soft);
+  margin: 22px 0 0;
+  max-width: 34ch;
+}
+.hero .meta {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  margin: 30px 0 0;
+  letter-spacing: 0.01em;
+}
+.hero .meta a { color: var(--ink-soft); text-decoration: none;
+  border-bottom: 1px solid var(--hair-strong); }
+.hero .meta a:hover { color: var(--accent); border-color: var(--accent); }
+.hero-ruler { margin-top: clamp(40px, 6vw, 64px); }
+
+/* ---- Sections ------------------------------------------------------------ */
+.sec { padding: clamp(44px, 6vw, 76px) 0 0; scroll-margin-top: 74px; }
+.sec-grid {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  column-gap: 44px;
+}
+.sec-index { grid-column: 1; }
+.sec-index .num {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.sec-index .tag {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  height: 8em;
+}
+.sec-body { grid-column: 2; min-width: 0; }
+.sec-body h2 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(1.7rem, 3.4vw, 2.35rem);
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  margin: -6px 0 0;
+}
+.sec-body .intro {
+  color: var(--ink-soft);
+  margin: 16px 0 0;
+  max-width: 60ch;
+}
+.prose { max-width: 62ch; }
+.prose p { margin: 1.05em 0 0; }
+
+/* ---- Router table -------------------------------------------------------- */
+.router { margin-top: 34px; }
+.router table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--hair-strong);
+}
+.router thead th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  text-align: left;
+  padding: 12px 20px 12px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.router thead th.c-reach { padding-left: 26px; border-left: 1px solid var(--hair); }
+.router tbody td {
+  vertical-align: baseline;
+  padding: 16px 20px 16px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.router tbody td.c-reach { padding-left: 26px; border-left: 1px solid var(--hair); }
+.router tbody tr { transition: background .15s; }
+.router tbody tr:hover { background: var(--raise); }
+.router .have { font-size: 1.02rem; line-height: 1.4; }
+.router .cmd {
+  font-family: var(--mono);
+  font-size: 0.94rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.router .cmd .slash { color: var(--accent); }
+.router .cmd-alt { color: var(--ink-faint); font-weight: 400; }
+.router .cmd-note {
+  display: block;
+  font-family: var(--serif);
+  font-size: 0.86rem;
+  line-height: 1.42;
+  color: var(--ink-soft);
+  margin-top: 7px;
+  white-space: normal;
+  max-width: 42ch;
+}
+.footnote {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  margin-top: 16px;
+  letter-spacing: 0.01em;
+}
+.footnote::before { content: "— "; color: var(--accent); }
+
+/* ---- Figures / diagrams -------------------------------------------------- */
+.figure { margin: 32px 0 0; }
+.figframe { position: relative; }
+.figure .frame {
+  border: 1px solid var(--hair);
+  background: var(--raise);
+  border-radius: 3px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hair-strong) transparent;
+}
+.figure .frame::-webkit-scrollbar { height: 8px; }
+.figure .frame::-webkit-scrollbar-thumb {
+  background: var(--hair-strong); border-radius: 4px;
+}
+.figure .frame::-webkit-scrollbar-track { background: transparent; }
+.figure .frame svg { display: block; width: 100%; height: auto; }
+.fig-tiers .frame svg { min-width: 560px; }
+.fig-cycle .frame svg { min-width: 460px; }
+/* horizontal-scroll affordance: right-edge fade shown only while more is offscreen */
+.scroll-cue {
+  position: absolute;
+  top: 1px; right: 1px; bottom: 1px;
+  width: 60px;
+  pointer-events: none;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(to right, transparent, var(--raise) 78%);
+  opacity: 0;
+  transition: opacity .2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.scroll-cue::after {
+  content: "";
+  width: 7px; height: 7px;
+  margin-right: 11px;
+  border-right: 1.5px solid var(--ink-faint);
+  border-bottom: 1.5px solid var(--ink-faint);
+  transform: rotate(-45deg);
+}
+.figframe.scrollable:not(.at-end) .scroll-cue { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .scroll-cue { transition: none; } }
+.figcap {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  margin-top: 12px;
+  letter-spacing: 0.02em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  align-items: center;
+}
+.figcap .lg { display: inline-flex; align-items: center; gap: 7px; }
+.figcap .lg svg { width: 13px; height: 13px; }
+
+/* diagram theming (inline SVG reads these vars) */
+.d-track { stroke: var(--hair-strong); fill: none; }
+.d-hair  { stroke: var(--hair); fill: none; }
+.d-tier  { stroke: var(--hair-strong); fill: none; }
+.d-node  { fill: var(--ink); }
+.d-node-accent { fill: var(--accent); }
+.d-mk    { stroke: var(--ink-soft); fill: none; }
+.d-ink   { fill: var(--ink); }
+.d-soft  { fill: var(--ink-soft); }
+.d-faint { fill: var(--ink-faint); }
+.d-accent-f { fill: var(--accent); }
+.d-accent-s { stroke: var(--accent); fill: none; }
+.d-paper { fill: var(--raise); }
+.d-arrow { stroke: var(--ink-soft); fill: none; }
+.figure svg text { font-family: var(--mono); }
+
+/* ---- Pull quotes --------------------------------------------------------- */
+.pull {
+  margin: 34px 0 0;
+  padding-left: 22px;
+  border-left: 2px solid var(--accent);
+}
+.pull .big {
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.pull .sub {
+  margin: 16px 0 0;
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+  max-width: 58ch;
+}
+
+/* ---- Footer -------------------------------------------------------------- */
+footer { margin-top: clamp(56px, 8vw, 96px); }
+.foot-in { padding: 30px 0 64px; }
+.foot-note {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: var(--ink-faint);
+  letter-spacing: 0.01em;
+}
+.foot-note b { color: var(--ink-soft); font-weight: 500; }
+.coming {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.coming li {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.coming li::before { content: "+ "; color: var(--accent); }
+
+/* ---- Motion -------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { opacity: 0; transform: translateY(10px); animation: rise .8s cubic-bezier(.2,.6,.2,1) forwards; }
+  .d1 { animation-delay: .05s; } .d2 { animation-delay: .14s; }
+  .d3 { animation-delay: .23s; } .d4 { animation-delay: .32s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+}
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .topnav a:not(.only-icon) { display: none; }
+  .sec-grid { grid-template-columns: 1fr; row-gap: 18px; }
+  .sec-index, .sec-body { grid-column: auto; }
+  .sec-index { display: flex; align-items: baseline; gap: 16px; }
+  .sec-index .tag {
+    writing-mode: horizontal-tb; transform: none; height: auto;
+    margin-top: 0; align-self: center;
+  }
+  .router .cmd-note { max-width: none; }
+}
+@media (max-width: 440px) {
+  .router thead th, .router tbody td { padding-right: 12px; }
+  .router tbody td.c-reach, .router thead th.c-reach { padding-left: 14px; }
+  .router .cmd { white-space: normal; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="#top"><span class="slash">/</span>adamsworkflow</a>
+    <nav class="topnav" aria-label="Sections">
+      <a href="#s1"><span class="n">01</span>Router</a>
+      <a href="#s2"><span class="n">02</span>Review</a>
+      <a href="#s3"><span class="n">03</span>Flywheel</a>
+      <button class="toggle only-icon" type="button" role="switch"
+              aria-label="Toggle dark mode" aria-checked="false">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12H5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.4 6.4 0 0 0 20 14.5Z"/></svg>
+        <span class="knob"></span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="kicker reveal d1">A config-share repo &nbsp;·&nbsp; Claude&nbsp;Code</span>
+      <h1 class="reveal d2">How I run<br>Claude&nbsp;Code.</h1>
+      <p class="lede reveal d3">The loops, the config, and the devbox — written down.</p>
+      <p class="meta reveal d4">
+        A guide, and my skills, commands, and config.
+        &nbsp;·&nbsp;
+        <a href="https://github.com/adamjgmiller/adamsworkflow">github.com/adamjgmiller/adamsworkflow</a>
+      </p>
+    </div>
+    <div class="wrap"><hr class="ruler hero-ruler reveal d4"></div>
+  </section>
+
+  <!-- 01 — Router -->
+  <section class="sec" id="s1">
+    <div class="wrap sec-grid">
+      <div class="sec-index">
+        <span class="num">01</span>
+        <span class="tag">Routing</span>
+      </div>
+      <div class="sec-body">
+        <h2>The ten-second router</h2>
+        <p class="intro">One table. Find the row that matches what you have in hand;
+          reach for what sits beside it. No decision tree, no ceremony.</p>
+
+        <div class="router">
+          <table>
+            <thead>
+              <tr>
+                <th class="c-have">You have</th>
+                <th class="c-reach">Reach for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="c-have"><span class="have">A trivial edit, or a pure question</span></td>
+                <td class="c-reach"><span class="cmd cmd-alt">just ask — no machinery</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A plan to execute in stages</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>orchestrate</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A meaningful change from a raw request</span></td>
+                <td class="c-reach">
+                  <span class="cmd"><span class="slash">/</span>build-system</span>
+                  <span class="cmd-note">Sizes its docs to the work: PRD&nbsp;+&nbsp;Plan for large,
+                    one Spec for medium, none for small.</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">GitHub issues to resolve, or a PR to ship</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>ship-issues</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A PR that needs review only</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>pr-auto-review</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A non-code deliverable — research, proposal, docs</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>teamwork</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A long, unattended goal</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>auto-run</span></td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A batch of decisions for the human</span></td>
+                <td class="c-reach">
+                  <span class="cmd"><span class="slash">/</span>make-it-easy</span>
+                  <span class="cmd-alt">&nbsp;or&nbsp;</span>
+                  <span class="cmd"><span class="slash">/</span>askme</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-have"><span class="have">A plan to stress-test with the human</span></td>
+                <td class="c-reach"><span class="cmd"><span class="slash">/</span>grill-me</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="footnote">First match wins, top to bottom.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><hr class="ruler"></div>
+
+  <!-- 02 — Review tiers -->
+  <section class="sec" id="s2">
+    <div class="wrap sec-grid">
+      <div class="sec-index">
+        <span class="num">02</span>
+        <span class="tag">Review</span>
+      </div>
+      <div class="sec-body">
+        <h2>Review tiers</h2>
+        <p class="intro">Three ascending tiers, cheapest to widest. Wrap any of them
+          in a fix loop when one pass isn&rsquo;t enough.</p>
+
+        <div class="figure fig-tiers">
+          <div class="figframe">
+          <div class="frame">
+            <svg viewBox="0 0 820 430" role="img"
+                 aria-label="Three ascending review tiers — quick-review, dual-review, lens-review — enclosed by review-fix-loop.">
+              <!-- breadth axis -->
+              <line class="d-hair" x1="132" y1="376" x2="132" y2="96" vector-effect="non-scaling-stroke"/>
+              <path class="d-hair" d="M132 96 l-4 8 M132 96 l4 8" vector-effect="non-scaling-stroke"/>
+              <text class="d-faint" x="120" y="236" font-size="11" letter-spacing="2"
+                    text-anchor="middle" transform="rotate(-90 120 236)">BREADTH</text>
+
+              <!-- review-fix-loop enclosure -->
+              <rect class="d-hair" x="158" y="74" width="624" height="322" rx="6"
+                    stroke-dasharray="2 5" vector-effect="non-scaling-stroke"/>
+              <rect class="d-paper" x="184" y="66" width="172" height="16"/>
+              <text class="d-ink" x="192" y="79" font-size="12.5" letter-spacing="-0.3">/review-fix-loop</text>
+              <!-- iterate glyph -->
+              <path class="d-accent-s" d="M757 88 a10 10 0 1 0 6 9" stroke-width="1.4"
+                    stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+              <path class="d-accent-s" d="M751 84 l6 3 -2 6" stroke-width="1.4"
+                    stroke-linecap="round" stroke-linejoin="round" fill="none" vector-effect="non-scaling-stroke"/>
+
+              <!-- tier 3 : lens -->
+              <rect class="d-tier" x="176" y="100" width="536" height="64" rx="4"
+                    stroke-width="1.25" vector-effect="non-scaling-stroke"/>
+              <text class="d-ink" x="192" y="137" font-size="15" letter-spacing="-0.4">/lens-review</text>
+              <g><rect class="d-mk" x="312" y="125.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+                 <circle class="d-mk" cx="346" cy="132" r="6.5" vector-effect="non-scaling-stroke"/>
+                 <rect class="d-mk" x="372" y="125.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+                 <circle class="d-mk" cx="406" cy="132" r="6.5" vector-effect="non-scaling-stroke"/>
+                 <rect class="d-mk" x="432" y="125.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+                 <circle class="d-mk" cx="466" cy="132" r="6.5" vector-effect="non-scaling-stroke"/>
+                 <rect class="d-mk" x="492" y="125.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+                 <circle class="d-mk" cx="526" cy="132" r="6.5" vector-effect="non-scaling-stroke"/></g>
+              <text class="d-faint" x="700" y="136" font-size="11" text-anchor="end">widest · read-only</text>
+
+              <!-- tier 2 : dual -->
+              <rect class="d-tier" x="176" y="200" width="414" height="64" rx="4"
+                    stroke-width="1.25" vector-effect="non-scaling-stroke"/>
+              <text class="d-ink" x="192" y="237" font-size="15" letter-spacing="-0.4">/dual-review</text>
+              <rect class="d-mk" x="312" y="225.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+              <circle class="d-mk" cx="346" cy="232" r="6.5" vector-effect="non-scaling-stroke"/>
+              <text class="d-faint" x="578" y="236" font-size="11" text-anchor="end">middle</text>
+
+              <!-- tier 1 : quick -->
+              <rect class="d-tier" x="176" y="300" width="294" height="64" rx="4"
+                    stroke-width="1.25" vector-effect="non-scaling-stroke"/>
+              <text class="d-ink" x="192" y="337" font-size="15" letter-spacing="-0.4">/quick-review</text>
+              <rect class="d-mk" x="312" y="325.5" width="13" height="13" rx="2" vector-effect="non-scaling-stroke"/>
+              <text class="d-faint" x="458" y="336" font-size="11" text-anchor="end">cheapest</text>
+            </svg>
+          </div>
+          <span class="scroll-cue" aria-hidden="true"></span>
+          </div>
+          <div class="figcap">
+            <span class="lg"><svg viewBox="0 0 14 14"><rect class="d-mk" x="1.5" y="1.5" width="10" height="10" rx="2" vector-effect="non-scaling-stroke"/></svg>Claude reviewer</span>
+            <span class="lg"><svg viewBox="0 0 14 14"><circle class="d-mk" cx="7" cy="7" r="5" vector-effect="non-scaling-stroke"/></svg>Codex reviewer</span>
+            <span>Findings deduped &amp; validated against the actual diff.</span>
+          </div>
+        </div>
+
+        <div class="pull">
+          <p class="big">Convergence is the goal.<br>The cap is the cost guard.</p>
+          <p class="sub">The loop runs review&nbsp;→&nbsp;fix&nbsp;→&nbsp;re-review until it converges,
+            hits steady state, regresses, or reaches the round cap.</p>
+        </div>
+
+        <div class="prose">
+          <p>Two reviewers from different vendors disagree in useful ways — dedup what
+            they agree on, investigate what they don&rsquo;t. <span class="mono">/quick-review</span>
+            is one inline Claude pass. <span class="mono">/dual-review</span> adds a detached
+            Codex CLI reviewer on the same scope. <span class="mono">/lens-review</span> fans
+            out a Claude&nbsp;+&nbsp;Codex pair per lens — the widest net, read-only.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><hr class="ruler"></div>
+
+  <!-- 03 — Flywheel -->
+  <section class="sec" id="s3">
+    <div class="wrap sec-grid">
+      <div class="sec-index">
+        <span class="num">03</span>
+        <span class="tag">Self-improvement</span>
+      </div>
+      <div class="sec-body">
+        <h2>The improvement flywheel</h2>
+        <p class="intro">The config isn&rsquo;t written once. Every session is a chance for it
+          to get a little sharper.</p>
+
+        <div class="figure fig-cycle">
+          <div class="figframe">
+          <div class="frame">
+            <svg viewBox="0 0 820 420" role="img"
+                 aria-label="A five-step improvement cycle: work a session, the agent surfaces one grounded improvement, you approve or not, config improves, next session starts stronger.">
+              <!-- track -->
+              <circle class="d-track" cx="410" cy="235" r="150"
+                      stroke-dasharray="1.5 6" vector-effect="non-scaling-stroke"/>
+
+              <!-- flow arrowheads at midpoints (rotate the top-tangent chevron) -->
+              <g class="d-arrow" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <g transform="rotate(36 410 235)"><path d="M406 79 L413 85 L406 91"/></g>
+                <g transform="rotate(108 410 235)"><path d="M406 79 L413 85 L406 91"/></g>
+                <g transform="rotate(180 410 235)"><path d="M406 79 L413 85 L406 91"/></g>
+                <g transform="rotate(252 410 235)"><path d="M406 79 L413 85 L406 91"/></g>
+                <g transform="rotate(324 410 235)"><path d="M406 79 L413 85 L406 91"/></g>
+              </g>
+
+              <!-- center -->
+              <text class="d-faint" x="410" y="231" font-size="10.5" letter-spacing="3" text-anchor="middle">IMPROVEMENT</text>
+              <text class="d-faint" x="410" y="247" font-size="10.5" letter-spacing="3" text-anchor="middle">LOOP</text>
+
+              <!-- nodes -->
+              <circle class="d-node" cx="410" cy="85" r="5.5"/>
+              <circle class="d-node" cx="552.6" cy="188.6" r="5.5"/>
+              <circle class="d-node" cx="498.2" cy="356.4" r="5.5"/>
+              <circle class="d-node-accent" cx="321.8" cy="356.4" r="5.5"/>
+              <circle class="d-node" cx="267.4" cy="188.6" r="5.5"/>
+
+              <!-- labels -->
+              <text class="d-faint" x="410" y="60"  font-size="11" text-anchor="middle">01</text>
+              <text class="d-ink"   x="410" y="76"  font-size="13" text-anchor="middle">work a session</text>
+
+              <text class="d-faint" x="572" y="182" font-size="11" text-anchor="start">02</text>
+              <text class="d-ink"   x="572" y="198" font-size="13" text-anchor="start">agent surfaces one</text>
+              <text class="d-ink"   x="572" y="214" font-size="13" text-anchor="start">grounded improvement</text>
+
+              <text class="d-faint" x="518" y="354" font-size="11" text-anchor="start">03</text>
+              <text class="d-ink"   x="518" y="370" font-size="13" text-anchor="start">you approve — or not</text>
+
+              <text class="d-accent-f" x="302" y="354" font-size="11" text-anchor="end">04</text>
+              <text class="d-accent-f" x="302" y="370" font-size="13" text-anchor="end" font-weight="500">config improves</text>
+
+              <text class="d-faint" x="248" y="182" font-size="11" text-anchor="end">05</text>
+              <text class="d-ink"   x="248" y="198" font-size="13" text-anchor="end">next session</text>
+              <text class="d-ink"   x="248" y="214" font-size="13" text-anchor="end">starts stronger</text>
+            </svg>
+          </div>
+          <span class="scroll-cue" aria-hidden="true"></span>
+          </div>
+          <div class="figcap">
+            <span>02 stays honest — one line, and only what the agent actually hit.</span>
+          </div>
+        </div>
+
+        <div class="prose">
+          <p>Every command and skill in this repo has been through this loop dozens of
+            times. Port the rule, not just the files — a snapshot goes stale; the loop is
+            what keeps it alive.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap"><hr class="ruler"></div>
+  <div class="wrap foot-in">
+    <p class="foot-note"><b>Design sample.</b> Establishing the visual language — three
+      sections shown. The full page will add:</p>
+    <ul class="coming">
+      <li>intake ladder</li>
+      <li>composition map</li>
+      <li>delegation &amp; model tiers</li>
+      <li>devbox stack</li>
+      <li>porting notes</li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var btn = document.querySelector('.toggle');
+  function sync() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.setAttribute('aria-checked', dark ? 'true' : 'false');
+  }
+  sync();
+  btn.addEventListener('click', function () {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('aw-theme', next); } catch (e) {}
+    sync();
+  });
+
+  // Horizontal-scroll cue for diagram frames: show the edge fade only while
+  // there is more diagram off to the right, hide it once scrolled to the end.
+  var frames = document.querySelectorAll('.figframe');
+  function updateCue(ff) {
+    var fr = ff.querySelector('.frame');
+    var scrollable = fr.scrollWidth > fr.clientWidth + 2;
+    ff.classList.toggle('scrollable', scrollable);
+    var atEnd = fr.scrollLeft >= fr.scrollWidth - fr.clientWidth - 2;
+    ff.classList.toggle('at-end', atEnd);
+  }
+  frames.forEach(function (ff) {
+    var fr = ff.querySelector('.frame');
+    updateCue(ff);
+    fr.addEventListener('scroll', function () { updateCue(ff); }, { passive: true });
+  });
+  window.addEventListener('resize', function () {
+    frames.forEach(updateCue);
+  });
+})();
+</script>
+</body>
+</html>
