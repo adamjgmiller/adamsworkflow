@@ -12,7 +12,7 @@ requires and how it degrades is in [CLAUDE.md](./CLAUDE.md); my global
 config, generalized, is [CLAUDE-global.md](./CLAUDE-global.md).
 
 To be clear about what you are getting: this is a dated snapshot of a living
-config (generalized 2026-07-18), not a framework — no version scheme, no
+config (generalized 2026-07-18, re-synced 2026-07-20), not a framework — no version scheme, no
 roadmap. It is what I actually run, cleaned up for machines that are not
 mine. This file itself was drafted and adversarially reviewed by the loops
 it describes; the final read, as always, is human.

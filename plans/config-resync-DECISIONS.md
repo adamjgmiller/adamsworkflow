@@ -33,17 +33,6 @@
 - **Dual-review**: no (Tier 1 — the goal text itself makes the gate non-negotiable)
 - **Journal ref**: S2 2026-07-20T06:08Z
 
-## D005 — S3b verify #5: intent reading over literal reading (skip-heredocs stay unquoted)
-- **When**: 2026-07-20T07:05Z — during S3b acceptance review
-- **Question**: My verify criterion said "no unquoted heredoc anywhere in either file", but the live source deliberately keeps two skip-comment heredocs unquoted (bodies interpolate only run-controlled SHAs/dates — no third-party text), and the ported explainer text states that contrast explicitly. Enforce the literal criterion or the intent?
-- **Options**:
-  - A. Literal — convert the two skip heredocs to quoted+printf too; diverges from live and contradicts the ported explainer
-  - B. Intent — the audited vulnerability was third-party (PR-derived) text reaching an expanding heredoc; the PR-comment assembly is the quoted+body-file+printf pattern; run-controlled-only heredocs are safe by the campaign's own analysis
-- **Chosen**: B. Faithful-port principle wins; my verify wording was overly broad. The stage-runner read the intent correctly and correctly declined to make the divergence itself.
-- **Reversibility**: trivial
-- **Dual-review**: no (Tier 1 — the live config's own audit already adjudicated this exact boundary)
-- **Journal ref**: S3b acceptance 2026-07-20T07:05Z
-
 ## D004 — config-change skill: ship as a NON-INSTALLED reference doc (C)
 - **When**: 2026-07-20T06:32Z — during S2 (opened 06:10Z)
 - **Question**: Ship the new config-change skill (the config-maintenance discipline), and if so in what form?
@@ -55,3 +44,28 @@
 - **Reversibility**: trivial pre-merge
 - **Dual-review**: yes — CONVERGED. Claude (Opus): C, high confidence — repo's own precedent; installed skill dead-ends; lightest doc ripple. Codex (0.144.4, exit=0): C, high (0.95) — same core reasons plus the three implementation constraints adopted above.
 - **Journal ref**: S2 2026-07-20T06:32Z
+
+## D005 — S3b verify #5: intent reading over literal reading (skip-heredocs stay unquoted)
+- **When**: 2026-07-20T07:05Z — during S3b acceptance review
+- **Question**: My verify criterion said "no unquoted heredoc anywhere in either file", but the live source deliberately keeps two skip-comment heredocs unquoted (bodies interpolate only run-controlled SHAs/dates — no third-party text), and the ported explainer text states that contrast explicitly. Enforce the literal criterion or the intent?
+- **Options**:
+  - A. Literal — convert the two skip heredocs to quoted+printf too; diverges from live and contradicts the ported explainer
+  - B. Intent — the audited vulnerability was third-party (PR-derived) text reaching an expanding heredoc; the PR-comment assembly is the quoted+body-file+printf pattern; run-controlled-only heredocs are safe by the campaign's own analysis
+- **Chosen**: B. Faithful-port principle wins; my verify wording was overly broad. The stage-runner read the intent correctly and correctly declined to make the divergence itself.
+- **Reversibility**: trivial
+- **Dual-review**: no (Tier 1 — the live config's own audit already adjudicated this exact boundary)
+- **Journal ref**: S3b acceptance 2026-07-20T07:05Z
+
+## D006 — Leakage incident: scrub + feature-branch history rewrite (force-with-lease)
+- **When**: 2026-07-20T10:40Z — during S6 close-out
+- **Question**: The /pr-auto-review agent's plans append described a generalization mapping by embedding the literal home path + local username as the example (the exact embed-the-literal failure mode the gate's new header note warns about). My close-out push chained `gate | tail` — the pipeline returned tail's exit code, masking the gate's FAIL — so two commits carrying the literal reached the public branch. Fix-forward (leaves the literal in public history, gate permanently red) or scrub + rewrite the two unpushed-elsewhere commits?
+- **Options**:
+  - A. Fix-forward commit — history keeps the literal; the gate's history scan fails forever (or needs an allow-list carve-out, weakening it)
+  - B. Scrub the line, `reset --soft` to the last clean commit, recommit clean, `push --force-with-lease` to the feature branch
+- **Chosen**: B. The goal makes the gate a hard requirement; the branch is this run's own working branch (draft PR, no other consumers, owner asleep) so the Tier-3 "shared branch" concern doesn't apply in substance; force-with-lease bounds the risk. The PR review comment's `after=` SHA dangles post-rewrite — acceptable: the idempotency contract parses only `before=`, which is untouched. A transparency note goes on the PR.
+- **Reversibility**: moderate (rewrite is itself the cleanup; nothing of value lost)
+- **Dual-review**: no (Tier 1 — leaving a gate-failing literal in public history is not defensible; the only real call was rewrite mechanics)
+- **Journal ref**: S6 2026-07-20T10:40Z
+
+## Summary
+5 decisions playing the human (D001-D005): 1 used dual-review (D004 — converged, verdict adopted with the Codex critic's implementation constraints), 0 paused for the user (none met Tier 3), 0 permission-gap skips. The /pr-auto-review per-PR agent additionally resolved its leave-vs-scrub privacy tie via the unattended tie-break and returned 3 posture calls + an upstream-defect list as data for Adam's morning gate (PR #2 comment).

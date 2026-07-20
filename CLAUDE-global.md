@@ -4,7 +4,7 @@
 >
 > **How to adopt it.** Merge the sections you want into your own `~/.claude/CLAUDE.md`, selectively — each section stands alone. Or hand this file to your Claude and ask it to merge the sections that fit your setup. Model tier names (Fable > Opus > Sonnet > Haiku) mean strongest → cheapest; map them onto whatever tiers you actually run.
 >
-> Generalized from the live config on 2026-07-18. The live original keeps evolving through the **Config feedback** loop below — which is why it comes first.
+> Generalized from the live config on 2026-07-18; re-synced to it 2026-07-20. The live original keeps evolving through the **Config feedback** loop below — which is why it comes first.
 
 # Config feedback
 

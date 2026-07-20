@@ -6,7 +6,7 @@ started: 2026-07-20T05:20Z
 
 # config-resync — umbrella
 
-## Goal (verbatim from /auto-run)
+## Goal (from /auto-run; home paths ~-normalized per D003)
 
 Overnight config re-sync of the adamsworkflow public guide repo. HOLD FIRST: wait ~3 hours from 05:17 UTC 2026-07-20 (until ~08:15 UTC) because another agent is actively finishing final review iterations in ~/Projects/skill-audit — do not disturb or race it; at wake, verify quiescence (no uncommitted churn/new commits in the last ~15 min; if still active, extend the wait in 30-min steps). THEN: (1) investigate everything that changed since the guide PR snapshot was taken — the skill-audit repo (audit rounds, fixes, LOG.md, reviews/) AND the live ~/.claude/ config (commands, skills, agents, workflows, scripts, CLAUDE.md) versus the shipped generalized copies in the adamsworkflow repo (now merged to main, github.com/adamjgmiller/adamsworkflow); (2) decide whether to include the new adams-field-research workflow (~/.claude/workflows/adams-field-research.js) — Adam delegated this decision to me; (3) create a fresh branch from updated origin/main (in the existing guide-rebuild worktree at ~/Projects/adamsworkflow/.claude/worktrees/guide-rebuild or a new worktree, my choice) and thoroughly update the repo's generalized copies, README, CLAUDE.md map, dependency matrix, and docs/index.html visual where affected; (4) the two-layer leakage gate (scripts/check-leakage.sh with private terms at ~/.config/adamsworkflow/leakage-terms.txt) MUST pass — this repo is public; run a privacy sweep on the full diff before pushing; (5) push the branch and open a DRAFT PR, run the full review loop on it until convergence, but DO NOT merge — merge is Adam's morning gate; (6) prepare a morning report: what changed, what I synced vs deliberately skipped, the field-research include/exclude decision with rationale, and any final decisions or risks Adam must weigh before merging. Pushing the feature branch and opening the draft PR are pre-approved. Never commit to main, never merge, never touch the running skill-audit agent's files (read-only there).
 
@@ -50,7 +50,7 @@ Orchestrate rather than doing the work in the main loop: use **Opus and Sonnet s
 
 ## Cursor
 
-S2 DECIDE — D001-D003 logged; D004 (config-change) in dual-review.
+COMPLETE — all stages done; draft PR #2 awaiting Adam's morning merge gate.
 
 ## Links
 
@@ -58,6 +58,23 @@ S2 DECIDE — D001-D003 logged; D004 (config-change) in dual-review.
 - Decisions: plans/config-resync-DECISIONS.md
 - Predecessor: guide-rebuild family (plans/guide-rebuild*.md) — SHIPPED via PR #1.
 
+## /pr-auto-review run, 2026-07-20
+
+**Before SHA**: `254c5de` (PR head this run started from — local HEAD, clean ff-sync no-op)
+**After SHA**: `254c5de` (== FANOUT_HEAD — no code fixes applied; this section's commit is the only delta)
+**Lenses run**: leakage · tool-semantics (mandated) · executable-correctness · consistency/carrier-sweep · goal-fit/accuracy — each Opus + Codex (codex-runner)
+**Sources scraped**: no prior PR comments/reviews/threads; greptile: skipped (not enabled)
+**Findings**: ~27 after dedup + validation (2 Codex findings dropped as invalid/false-positive)
+**Fixed**: 0
+**Not fixed**: all — documented, not fixed (rationale below)
+**Tests**: skipped (no test command in repo — expected for a docs/config repo)
+**Promotion**: blocked — left draft for Adam's morning merge gate (privacy judgment calls + upstream config defects surfaced)
+
+### Meaningful decisions
+- **Re-sync verified faithful.** Diffed every shipped command/skill/agent/workflow against the live `~/.claude` source: byte-identical except cosmetic generalization edits (`harness-notes`→`field-notes`, `bb-`→`claude-` de-branding, Greptile→external-bot abstraction, home-path/username literals→placeholder form, Tailscale specifics→generalized). **No port-introduced regression.** So every tool-semantics + `.js` robustness finding is a defect that exists identically UPSTREAM in the live config → documented for upstream fix + re-sync, **not** fixed in the mirror (fixing the mirror alone creates the live-vs-shipped drift the repo's own thesis warns against).
+- **Leakage (public repo) → LEAVE + surface.** 3 items Codex rated HIGH but the S4 fresh-eyes sweep + the Opus leakage lens rated LOW/deliberate: (1) plans/ campaign narrative naming the private `skill-audit` repo + opaque SHAs — already public on `main` via PR #1; (2) `docs/config-change-reference.md` chezmoi/infra worked-example — the deliberate, dual-reviewed D004 decision; (3) Greptile vendor name + availability in plans/ — low-sensitivity public SaaS the shipped suite abstracts to "external PR bot". Resolved to LEAVE per the unattended tie-break (reversible; least-action; already-public / deliberate / low-sensitivity; leakage gate passes with no hard-class hit) and surfaced for Adam's conscious morning-gate call — not auto-scrubbed (the human owns the public-footprint decision).
+- **Dropped as invalid:** Codex tool-semantics `cat-file -e`-vs-ancestry (the tree-diff is the correct cost-guard check; the command documents this behavior as intended) and Codex consistency dispatch-sense "foreground" (flagged instances are the correct "no foreground mode" phrasing, a historical narrative ref, and the deliberate vocabulary-grep example).
+
 ## Outcome
 
-_TBD_
+ACHIEVED. Draft PR #2 delivers the full re-sync (34 files: ~30 shipped copies ported to the post-audit live config + 3 new artifacts + repo self-docs), verified faithful by a 10-reviewer /pr-auto-review fan-out that found zero port-introduced regressions and zero mirror-fixable meaningful issues. Leakage gate clean at every commit and on the full branch; adversarial privacy sweep clean of all hard classes. Left draft on purpose — merge is Adam's gate, with three privacy posture calls and an upstream-defect list (live-config fixes, then re-sync) documented in the PR's review comment. All five decisions (D001-D005) logged; D004 resolved by a converged Claude+Codex dual-review.
