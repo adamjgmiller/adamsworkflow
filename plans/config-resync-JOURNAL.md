@@ -1,7 +1,7 @@
 # config-resync execution journal
 
 ## Cursor
-Current: S4 GATE — plans committed; full-branch gate + fresh-eyes privacy sweep
+Current: S5 SHIP — push + draft PR + /pr-auto-review loop
 
 ## S0 — Hold for skill-audit agent
 - 2026-07-20T05:17Z /auto-run engaged. Recon: skill-audit repo at d3b5127 (adams-field-research workflow + override guards), tools/probes.md uncommitted → agent still active. ~/.claude/workflows/ now has adams-field-research.js alongside adams-deep-research.js.
@@ -37,5 +37,9 @@ Current: S4 GATE — plans committed; full-branch gate + fresh-eyes privacy swee
 
 ## S4 — Gate
 - 2026-07-20T09:22Z Plans files committed; full-branch gate + independent fresh-eyes Opus privacy sweep dispatched over origin/main..HEAD.
+- 2026-07-20T09:35Z S4 COMPLETE. Gate clean on all 10 commits. Fresh-eyes sweep verdict: CLEAN of all hard classes (full 3165-line diff across 33 files, all commit messages + trailer negative-space, new files + plans files in full); 3 LOW judgment items. Rulings: (1) campaign-narrative depth in plans — LEAVE (name + file-class already public on main via PR #1; on-thesis content; flagged in morning report as optional pre-merge trim); (2) machine-local Codex job ID in DECISIONS — FIXED (dropped, zero public value); (3) timestamp schedule inference — LEAVE (coarse, consistent with public premise).
+
+## S5 — Ship
+- 2026-07-20T09:36Z Pushing branch, opening DRAFT PR, then /pr-auto-review to convergence. greptile: skipped (not enabled — availability 0). Review must include a tool-semantics lens on pr-auto-review.md's edited sections (the campaign's standing watch: that file is not certified empty; future edits carry one section-scoped semantics round). NO MERGE — Adam's morning gate.
 - 2026-07-20T08:50Z S3d2 COMPLETE: pass, 3 commits (1e8890b mechanical ×9, 7c84978 field-research NEW, b3cdb8a config-change reference NEW; +487/−56), gate clean ×3, fresh verify leaf all-11 PASS. Main-loop verification: ancestry OK; config-change-reference head read — reference-only preamble + 5-role mapping table with worked-example column, exactly the D004 shape; field-research generalization faithful ("When the user wants", stats+date kept, topic/run-ID dropped, node --check OK). Judgment calls endorsed: (a) "Not a bare existence check" rewording; (b) no added header to field-research — its own lines 14-18 comment block already self-describes (parity in spirit). Stage advanced.
 - 2026-07-20T08:15Z S3d1 COMPLETE: pass, commit 28a6eea (+231/−115). Extraction mirrored (ship-issues −168 lines to pointer structure; pathB doc created, 175 lines, generalized — external-bot voice, claude-stash.lock, field-notes cites, sonnet pins verbatim); non-extraction deltas all present (steady-state enum L199, fabric telemetry, waterfall judgment L168, unattended-variant cite, deploy hard-rule). COUPLING mirrored both ends: ship-issues Appendix D cite + pathB §D cite + pr-auto-review Step-3 marker (L95, verified in main loop). Runner's skips endorsed: personal deploy references stay generalized as shipped had them. Independent verify leaf: all parity checks pass, nothing dropped, nothing resurrected. Main-loop verification: ancestry OK, 6 pointer refs, pathB header faithful, Step-7 canonical text intact.
