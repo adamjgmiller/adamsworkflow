@@ -92,6 +92,9 @@ else
   git branch -f "$LOCAL_REF" "${FORK_REMOTE}/${PR_BRANCH}"   # -f: a stale pr-<N> from a removed worktree must not seed the new one
 fi
 
+# ---- Canonical worktree-materialization block (ship-issues Appendix D cites this:
+# ---- anchor -> SLUG -> collision suffix -> exclude line -> add -> .env symlink;
+# ---- the flock wrapper and the ref checked out stay caller-specific) ----
 # Anchor at the MAIN checkout root, not the current worktree: `git rev-parse
 # --show-toplevel` would nest .claude/worktrees/ inside a worktree if this runs from
 # one. `--git-common-dir` resolves to the shared <main>/.git from anywhere; its
