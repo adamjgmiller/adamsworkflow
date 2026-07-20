@@ -123,8 +123,8 @@ Applies to both modes, but matters most in execute mode.
 - **The top level of recursive trust-the-diff.** Reports describe
   *intent*; the diff is *truth* — at every level. The stage-runner
   reconciles its children's reports against the `git diff` it holds
-  locally; you verify every commit SHA it returns resolves on HEAD
-  (`git cat-file -e <sha>`) and spot-read the stage's diff before
+  locally; you verify every commit SHA it returns is an ancestor of HEAD
+  (`git merge-base --is-ancestor <sha> HEAD`) and spot-read the stage's diff before
   journaling or advancing. If a reported change isn't in the diff — or a
   reported SHA isn't on HEAD — it didn't happen: re-dispatch, don't
   advance. This is the single most common cause of orchestrators
@@ -224,8 +224,13 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
 5. If the plan is long-lived (>5 stages or will likely span multiple
    sessions), offer to write it to the repo's planning directory (check
    for `plans/`, `docs/plans/`, or similar — use the existing convention)
-   with a companion `-execution.md` journal scaffold. Otherwise present
-   the plan inline via `ExitPlanMode`.
+   with a companion `-execution.md` journal scaffold — except when the
+   plans/ layout is in force (linked worktree, build-system engaged, or
+   running under `/auto-run`), where the scaffold is the branch's
+   `plans/<branch>-JOURNAL.md` sidecar instead (under `/auto-run`, its
+   resolved `STATE_STEM`: `plans/<STATE_STEM>-JOURNAL.md`; matching
+   execute mode item 2), so neither build-system nor auto-run ends up
+   with two journals. Otherwise present the plan inline via `ExitPlanMode`.
 
 6. **Auto-transition to execute mode by default** once the plan is
    presented (inline approval via `ExitPlanMode`, or after writing the
@@ -249,8 +254,21 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
    memory), re-read the journal from disk before advancing. The cursor
    line is the source of truth, not your recollection.
 
+   **Branch first:** if HEAD is on the default branch, create/enter a
+   working branch (or worktree) before dispatching any mutating stage —
+   stage commits never land on main (your global CLAUDE.md's
+   never-commit-to-main rule; review-fix-loop Step 1 runs the same
+   preflight).
+
 2. **Decide on a build journal.** Create one at
-   `<planning-dir>/<topic>-execution.md` when *any* of these hold:
+   `<planning-dir>/<topic>-execution.md` — except when the plans/ layout is in
+   force (linked worktree, build-system engaged, or running under `/auto-run`,
+   whose durable state expects `plans/<branch>-JOURNAL.md`: your global CLAUDE.md § Plan
+   artifacts), where the journal is the branch's `plans/<branch>-JOURNAL.md`
+   sidecar instead (under `/auto-run`, its resolved `STATE_STEM`:
+   `plans/<STATE_STEM>-JOURNAL.md`), so the umbrella's index can reference it
+   and neither build-system nor auto-run ends up with two journals. Create it
+   when *any* of these hold:
    - Plan has >2 stages, OR
    - Any stage expects retry/verify loops, OR
    - Work will likely span multiple sessions / context-compaction events, OR
@@ -267,7 +285,9 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
    # <Topic> execution journal
 
    ## Cursor
-   Current: <stage-id> step <N> — <short status>
+   Current: <stage-id> — dispatched | complete — <short status>
+   (stage-granular by design: recovery re-runs the whole stage from cycle 1;
+   mid-stage step state is ephemeral and never a resumable position)
 
    ## Stage <id> — <name>
    - <ISO-time> start
@@ -297,7 +317,8 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
    internally, up to
    **3 times**, fanning out its own builder/verifier/diagnoser leaves,
    and returns one compact bundle: outcome (`pass`|`fail`|`halt`),
-   cumulative diff + commit SHA(s), a findings/decisions digest, and any
+   cumulative diff + commit SHA(s), the verify result (concrete final
+   pass/fail counts, never "pending"), a findings/decisions digest, and any
    packaged human-decision. A stage that genuinely needs live user input
    mid-stage (rare; plan-flagged) stays on the main loop instead —
    delegate only non-interactive stages.
@@ -352,9 +373,13 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
       what you changed. Do not commit."* On cycles 2 and 3, include the
       prior cycle's failure report and diagnosis as context.
 
-   b. **Spot-check.** The stage-runner reads its local `git diff`. If
-      the diff doesn't match intent, skip verify and go to (d) — a
-      wasted build burns a cycle.
+   b. **Spot-check.** The stage-runner inventories `git status
+      --porcelain --untracked-files=all` and reads the full pending
+      state: `git diff` (unstaged), `git diff --cached` (anything the
+      builder staged), and the untracked files the porcelain lists —
+      bare `git diff` alone shows neither staged edits nor new files,
+      and stages commonly create files. If the work doesn't match
+      intent, skip verify and go to (d) — a wasted build burns a cycle.
 
    c. **Verify.** Run the stage's verify check. For mechanical verifies
       (tests exit 0, smoke passes, type-check succeeds), the builder
@@ -380,13 +405,21 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
 
    **On return (conductor work — never delegate this):**
 
-   - **Verify the SHAs.** Every commit SHA in the bundle must resolve on
-     HEAD: `git cat-file -e <sha>`. This is recursive trust-the-diff:
-     the stage-runner reconciled its children against its local diff;
-     you verify its claim against actual repo state. A SHA that doesn't
-     resolve means the stage didn't land — treat it as a fail and
-     re-dispatch; don't advance.
-   - **Spot-read the stage's diff** (`git show <sha>` / `git diff`)
+   - **Verify the SHAs.** Every commit SHA in the bundle must be an
+     ancestor of HEAD: `git merge-base --is-ancestor <sha> HEAD` (run
+     from the checkout the stage was to land on — the conductor's working
+     tree; for worktree-isolated parallel stages, after the integration
+     merge, per the parallel bullet). Not a bare existence check —
+     worktrees share one object store, so mere existence passes for any
+     object anywhere in the repo, including a commit landed in the wrong
+     tree. This is recursive trust-the-diff: the stage-runner reconciled
+     its children against its local diff; you verify its claim against
+     actual repo state. A SHA that isn't an ancestor means the stage
+     didn't land on this branch — treat it as a fail and re-dispatch;
+     don't advance.
+   - **Spot-read the stage's diff** (`git show --first-parent <sha>` /
+     `git diff`; `--first-parent` is a no-op on normal commits but keeps
+     a merge SHA from showing an empty combined diff)
      against the bundle's digest — trust but verify, one level up.
    - **Journal** the stage (commit SHAs, verify delta, notable
      decisions); advance the cursor.
@@ -406,9 +439,11 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
    relevant,
    and decide whether the next stage's premise still holds. Also
    reconcile the journal: every commit SHA the journal records should
-   still resolve on HEAD (`git cat-file -e <sha>`) — if a commit got
-   reverted or rebased away, fix the journal before continuing, so the
-   record doesn't silently lie about what's landed. If replanning is
+   still be an ancestor of HEAD (`git merge-base --is-ancestor <sha> HEAD`)
+   — if a commit got rebased away, fix the journal before continuing, so the
+   record doesn't silently lie about what's landed. (A `git revert` leaves the
+   original SHA an ancestor — this check cannot see reverts; a stage that
+   reverts earlier work must journal that itself.) If replanning is
    needed, dispatch a `Plan` sub-agent with the updated context. If
    nothing's changed, just proceed. One or two sentences to the user
    about what you checked is usually right.
@@ -460,13 +495,20 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
   the edit — do those inline and log to the journal.
 - **Parallel stages when safe.** Sequential stages are the default, but
   if two adjacent stages touch disjoint files *and* their verifies
-  don't depend on each other's output, dispatch both stage-runners in a
-  single message (multiple `Agent` tool-use blocks) so they run
-  concurrently. Remember each stage-runner fans out its own children —
-  two concurrent stages is more like four-to-six concurrent agents;
-  count the real number before adding a third. SHA-verify and journal
-  each returned bundle separately — one commit-set per stage keeps the
-  journal readable. Parallelize only when it's clearly safe; when in
+  don't depend on each other's output, they may run concurrently —
+  **each in its own worktree** (`isolation: 'worktree'` on the Agent
+  dispatch; trustworthy as of v2.1.210). Disjoint files do NOT make one
+  shared checkout safe: the runners would share one index and HEAD —
+  `index.lock` races, sibling uncommitted diffs polluting each other's
+  trust-the-diff spot-checks, sibling edits swept into commits.
+  **Integration is yours, not theirs**: when the bundles return, merge
+  each stage's commits into the working branch yourself, in stage order
+  (`git merge <stage-tip-sha>` — disjoint files make these trivial),
+  THEN run the ancestry check and journal against the post-merge HEAD —
+  one commit-set per stage keeps the journal readable. Remember each
+  stage-runner fans out its own children — two concurrent stages is
+  more like four-to-six concurrent agents; count the real number before
+  adding a third. Parallelize only when it's clearly safe; when in
   doubt, stay sequential. If any parallel stage-runner fails, serialize
   the retry — diagnose and re-dispatch each independently rather than
   running parallel failure recovery.
@@ -491,6 +533,6 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
   The stage-runner does the committing, so this rides in its brief.
 - Trust but verify, recursively: the stage-runner spot-reads its
   children's work against its local diff before committing; you
-  spot-read the returned stage diff and `git cat-file -e` every reported
-  SHA before journaling. Reports describe intent; the diff is truth — at
-  both levels.
+  spot-read the returned stage diff and ancestry-check every reported
+  SHA (`git merge-base --is-ancestor <sha> HEAD`) before journaling.
+  Reports describe intent; the diff is truth — at both levels.

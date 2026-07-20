@@ -6,9 +6,9 @@ description: Build a polished visual page (report, deep-dive, walkthrough, compa
 
 Thin wrapper over the **Communication visuals** rule in your global CLAUDE.md (see `CLAUDE-global.md` in this repo): turn `$ARGUMENTS` (the topic / material to communicate) into one polished, self-contained HTML page built by the `visual-builder` agent and served for preview. With no arguments, build the page the current conversation obviously calls for; if nothing does, ask what to visualize.
 
-**Scope guard — communication only.** This command and the `visual-builder` agent exist solely for pages that communicate with me — reports, deep-dives, walkthroughs, comparisons, proposals. Never use either for visuals that are part of an actual project/app deliverable (product UI, site pages, in-repo docs assets) — those belong to the project's own code and design pipeline (e.g. frontend-design). If the ask is really project output, say so and route it there instead.
+**Scope guard — communication only.** This command and the `visual-builder` agent exist solely for pages that communicate with me — reports, deep-dives, walkthroughs, comparisons, proposals. Never use either for visuals that are part of an actual project/app deliverable (product UI, site pages, in-repo docs assets) — those belong to the project's own code and design pipeline (e.g. frontend-design). Code walkthroughs (a diff, subsystem, or codebase tour) are also out of scope — those go through `/guided-tour`, never here. If the ask is really project output or a code tour, say so and route it there instead.
 
-**Carve-out — permanent/critical reference pages** (per your global CLAUDE.md → Communication visuals): when the page is a long-lived reference to my own system and the content was synthesized in-session, the briefing hop is the dominant risk — build it inline as the main agent (reusing the visual-page design system), or recommend that, instead of dispatching. Routine communication pages stay delegated per the steps below.
+**Carve-out — permanent/critical reference pages**: long-lived reference to my own system + content synthesized in-session → build it inline as the main agent (or recommend that) instead of dispatching — see your global CLAUDE.md → Communication visuals for the rationale. Routine communication pages stay delegated per the steps below.
 
 ## Steps (you, the main agent)
 

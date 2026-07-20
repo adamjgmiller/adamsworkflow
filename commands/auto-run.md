@@ -7,13 +7,13 @@ You've been invoked with `/auto-run`. The goal — and any nested commands the u
 
 This runs in `bypassPermissions`/auto mode. The user will have pre-granted what they expect in the goal text. Hit a permission gap you can't work around → skip + log + continue (see "Permission gaps").
 
-**Compaction will happen.** Maintain durable state in `plans/<branch>.md`, `plans/<branch>-JOURNAL.md`, and `plans/<branch>-DECISIONS.md` *as you work* — not at the end. Re-read them at session start (or any time context feels unfamiliar) before acting.
+**Compaction will happen.** Maintain durable state in the `plans/<STATE_STEM>-*` file set (umbrella `plans/<STATE_STEM>.md`, `-JOURNAL`, `-DECISIONS`; `STATE_STEM` is resolved in Triage) *as you work* — not at the end. Re-read them at session start (or any time context feels unfamiliar) before acting.
 
 ## Triage (do this first, in one short response)
 
 1. **Read `$ARGUMENTS`.** Identify: the goal (1-2 sentence summary), the nested methodology commands (`/orchestrate`, `/pr-auto-review`, `/dual-review`, etc.), and any explicit overrides (e.g., "push and open a PR" overriding `/orchestrate`'s "no push" rule).
-2. **Pick paths.** `git rev-parse --git-dir` succeeds → use `plans/<branch>-*` per the global CLAUDE.md plan-artifacts convention (see `CLAUDE-global.md` in this repo). Not a git repo → fall back to `./auto-run-<short-topic>/{umbrella,journal,decisions}.md`. State the paths.
-3. **If resuming** (the three files already exist for this branch): read umbrella → cursor → last ~10 DECISIONS → last ~10 journal entries. Don't replan. Resume from cursor.
+2. **Pick paths.** `git rev-parse --git-dir` succeeds → use `plans/<STATE_STEM>-*` per the global CLAUDE.md plan-artifacts convention (see `CLAUDE-global.md` in this repo), where the durable-state stem is a variable **`STATE_STEM`** (default `<branch>`; step 3 may resolve it to a suffixed family). Not a git repo → fall back to `./auto-run-<short-topic>/{umbrella,journal,decisions}.md` (no suffixing). State the paths. **Everywhere else in this file, substitute `STATE_STEM` for `<branch>` in every durable-state path** — umbrella `plans/<branch>.md`, sidecars `plans/<branch>-JOURNAL.md` / `-DECISIONS.md`.
+3. **If any `plans/<branch>`-family set already exists** (`<branch>`, `<branch>-2`, …): read their umbrellas newest-first and gate — resume the newest whose stored Goal matches `$ARGUMENTS` (or `$ARGUMENTS` is empty/continue-style) AND whose umbrella records no terminal Outcome, and set `STATE_STEM` to that member's stem. Then read cursor → last ~10 DECISIONS → last ~10 journal entries; don't replan; resume from cursor. If none match (a different goal, or every prior run completed) → this is a NEW run: set `STATE_STEM` to the next collision-free suffixed stem (`<branch>-2`, `-3` — the plans collision convention), leave the old files, and note the predecessor in the new umbrella.
 4. **If fresh**: write the umbrella with goal verbatim, methodology commands list, permission grants the user pre-authorized, explicit nested-command overrides, and a `Cursor` line.
 5. **Announce in one sentence**: *"Auto-running: <goal>; methodology: <commands>; state at `plans/<branch>-*.md`; starting."* Then begin — no plan-and-wait.
 
@@ -34,7 +34,7 @@ Most decisions. Small fixes, mechanical promotes, well-defined scope picks, low-
 2. The work so far (read the journal + diff)
 3. The nested command's recommended option (most prompts surface one — take it unless your judgment + goal disagrees)
 
-Log a 3-5 line entry to `DECISIONS.md`.
+Log a DECISIONS entry (template + length guide in the DECISIONS section below).
 
 ### Tier 2 — Tough call (dual-review first)
 
@@ -50,7 +50,7 @@ Then:
 2. Read both verdicts. **Converged** → take it. **Diverged** → you make the call, *and* log the divergence + your rationale so the user can sanity-check at the end.
 3. Log the verdicts in the DECISIONS entry.
 
-**Keeping the volume out of main context:** you MAY hand step 1 to one review-coordinator sub-agent (`general-purpose` — it needs the `Agent` tool to dispatch the manual pre-code pair; dual-review itself needs none; brief it to collect both of that pair's completion task-notifications before returning — async dispatch; field-notes §4) (it runs the `/dual-review` — or the manual pre-code pair — and returns the bundle). Its return contract must preserve the **divergence signal: both verdicts, any diverged takes verbatim, and each side's rationale** — never a flattened "reviewers agree on A". Steps 2-3, the DECISIONS divergence log, and the close-out's consequential-decisions surfacing all read that signal; a coordinator that collapses it silently drops this command's highest-value flags.
+**Keeping the volume out of main context:** you MAY hand step 1 to one review-coordinator sub-agent (`general-purpose`, `model: opus` explicit — a conductor per the delegation policy; never leave it to inheritance — it needs the `Agent` tool to dispatch the manual pre-code pair; dual-review itself needs none; brief it to collect both of that pair's completion task-notifications before returning — async dispatch; field-notes §4) (it runs the `/dual-review` — or the manual pre-code pair — and returns the bundle). Its return contract must preserve the **divergence signal: both verdicts, any diverged takes verbatim, and each side's rationale** — never a flattened "reviewers agree on A". Steps 2-3, the DECISIONS divergence log, and the close-out's consequential-decisions surfacing all read that signal; a coordinator that collapses it silently drops this command's highest-value flags.
 
 ### Tier 3 — Critical and irreversible (pause for user)
 
@@ -59,8 +59,9 @@ The narrow exception. Only when guessing wrong would cause real-world harm that 
 - Sending external communications (email, Slack/SMS, public posts) to people outside this session
 - Force-pushing a shared branch (main/master, anything publicly tracked)
 - Deleting/dropping data outside this repo (databases, prod state, cloud resources, paid infra)
-- Opening PRs to repos outside the user's control
+- Opening PRs — or posting comments — on repos outside the user's control
 - Merging a PR — even in the user's own repo — unless the goal text explicitly directs that merge (the goal-overrides rule below then applies)
+- Deploying to a shared or production environment — unless the goal text explicitly directs that deploy (same goal-overrides rule)
 - Spending real money beyond what the goal pre-authorized
 
 For those: dispatch `AskUserQuestion` and **wait**. Log both the pause and the user's answer in DECISIONS. Treat the answer as authoritative for this run only.
@@ -139,13 +140,13 @@ Whenever working memory feels unfamiliar (a compaction telltale), or at session 
 
 ## Working rules
 
-- **Delegate as `/orchestrate` does** — sub-agents do per-step work; orchestrator holds coordination, decision-making, and reconciling-against-diff. Brief each sub-agent like a smart colleague who just walked in (full context + the goal-as-north-star where relevant).
+- **Delegate as `/orchestrate` does** — sub-agents do per-step work; orchestrator holds coordination, decision-making, and reconciling-against-diff. Pass an explicit `model:` on every dispatch per the delegation policy (default `opus` for stages/conductors; an unpinned dispatch inherits the session model). Brief each sub-agent like a smart colleague who just walked in (full context + the goal-as-north-star where relevant).
 - **Nested delegation (auto-run-local override)** — a delegated stage MAY spawn one bounded second level of its own children (`general-purpose` Task-fabric sub-agents can spawn — `Explore`/`Plan` types cannot; field-notes §1 — the `stage-runner` def at `~/.claude/agents/stage-runner.md` carries the contract). Brief every nesting stage to count its child dispatches and collect every child's completion task-notification before advancing (dispatches are async-only; completions re-wake a stopped parent — field-notes §4). Stay within the ~3-4-level depth convention (field-notes §5). Budget honestly: nesting multiplies the parallel-work rule below, so the real concurrent-agent count is the **sum** of your own parallel dispatches plus every nested child they spawn — sum it before dispatching and keep it modest (field-notes §6). Tier-3-reachable work never gets delegated at all — see "Play the human". Brief every delegated stage to return a decisions digest (decision, options, choice, rationale) for any call that would have been a user prompt; on return, transcribe each entry into DECISIONS.md (marked 'decided in <stage> stage-agent') before moving on.
 - **Reconcile against truth** — sub-agent reports describe *intent*; the diff is *truth*. If a reported change isn't in the diff, re-dispatch. Don't advance on phantom work.
 - **Spot-check before commit** — read the diff. If it doesn't match the dispatch brief, redo or repair before committing.
 - **Plan mode** — exit immediately on entry.
 - **Never weaken a verify silently.** Skipping a check and logging it to DECISIONS is fine when the alternative is hours stuck on a tangent. Silently lowering the bar is not.
-- **Parallel work where safe** — multiple Agent tool-uses in one message when stages are independent; count any nested children toward the same concurrent-agent sum (see "Nested delegation" above).
+- **Parallel work where safe** — multiple Agent tool-uses in one message when stages are independent; count any nested children toward the same concurrent-agent sum (see "Nested delegation" above). **Parallel MUTATING stages each run in their own worktree** (`isolation: 'worktree'` on the dispatch) — disjoint files do NOT make one shared checkout safe: the runners share one index and HEAD (`index.lock` races, sibling diffs polluting each other's spot-checks, sibling edits swept into commits). Integration is yours: when the bundles return, merge each stage's commits into the working branch in stage order (`git merge <stage-tip-sha>`), then ancestry-check (`git merge-base --is-ancestor`) against the post-merge HEAD before you verify or journal (the check orchestrate mandates for the same operation). Read-only parallel work (searches, reviewers) is unchanged.
 
 ## Closing protocol
 

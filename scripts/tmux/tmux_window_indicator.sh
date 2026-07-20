@@ -146,8 +146,12 @@ autoname=$(tmux display-message -p -t "$TMUX_PANE" '#{automatic-rename}' 2>/dev/
 is_default=0
 [ "$autoname" = "1" ] && is_default=1
 case "$base" in
-  claude|[0-9]*.[0-9]*.[0-9]*) is_default=1 ;;
+  claude) is_default=1 ;;
 esac
+# Anchored regex, not a case glob: [0-9]*.[0-9]*.[0-9]* also matched manual
+# names like "2026.07.19-audit" (each * accepts arbitrary text), clobbering
+# deliberate renames the comment above promises to preserve.
+if [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then is_default=1; fi
 if [ "$is_default" = "1" ]; then
   if root=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
     base=$(basename "$root")

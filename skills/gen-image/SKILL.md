@@ -1,6 +1,6 @@
 ---
 name: gen-image
-description: Generate or edit images with Google's Gemini image family ("Nano Banana") in one Bash call — bring your own Google key (Vertex or Gemini API). Illustrations for communication pages, make-it-easy cards, docs, walkthroughs. Text→image, or image(s)+prompt→edited/restyled image. Use whenever a generated illustration would genuinely aid a deliverable; never decoration for its own sake.
+description: Generate or edit images with Google's Gemini image family ("Nano Banana") in one Bash call — bring your own Google key (Vertex or Gemini API). Illustrations for communication pages, docs, walkthroughs (make-it-easy generates its own card images — don't call this inside a make-it-easy run). Text→image, or image(s)+prompt→edited/restyled image. Use whenever a generated illustration would genuinely aid a deliverable; never decoration for its own sake.
 ---
 
 # gen-image

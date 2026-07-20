@@ -15,6 +15,25 @@ the actual code, your tour just guides their attention.
 linked pages for large scopes); pass `--md` for the plain-markdown form. Either
 way, clickability into real code is the whole point — see § Link format.
 
+## Who builds it (per your global CLAUDE.md → Communication visuals: tours are the code-visual route)
+
+- **`--session` scope → inline.** The content IS this conversation's context — no
+  sub-agent can see it; the main agent curates and builds.
+- **Cold scopes (`--branch`, `--range`, `--path`, `--pr`, `--codebase`) → delegate
+  wholesale**: dispatch ONE `general-purpose` sub-agent with a pointer brief — *"read
+  `~/.claude/commands/guided-tour.md` and execute it for scope `<flag/args>` in repo
+  `<abs path>`; write to `<OUTPUT_PATH>`"* — passing `model:` explicitly per the
+  Communication-visuals tiering (Opus normally · Sonnet genuinely simple · Fable
+  complex + costly-if-subtly-wrong), never above the session tier. The content is all
+  on disk, so a pointer brief is payload-complete. **The dispatched sub-agent IS the
+  builder**: it runs Steps 1–3, writes the page(s) to `<OUTPUT_PATH>`, and returns —
+  it does not re-enter this delegation bullet and does not run Step 4's serve/send.
+  The dispatcher serves/sends the result itself (§ Step 4) and spot-checks that stop
+  links resolve.
+- Either way the page reuses the **visual-page design system**
+  (`~/.claude/scripts/visual-page/` — palette + components); the tour's stop-nav
+  layout extends it. Never route tours through `visual-builder`.
+
 ## Usage
 
 Scope (what to tour):
@@ -60,11 +79,11 @@ plausible, ask:
 
 > **Question header**: "Scope"
 > **Question**: "Tour what?"
-> **Options** (only include those that have meaningful content):
+> **Options** (only include those that have meaningful content; the harness adds a
+> free-form "Other" automatically — don't list one; the user types a range/path/PR there):
 >   - "This branch (N commits ahead of `<base>`)" — the branch diff
 >   - "Recent session work (~M files changed since `<short SHA>`)" — session scope
 >   - "Whole codebase from current dir" — architecture tour
->   - "Other (specify)" — user types a range/path/PR
 
 If there is nothing to tour (empty diff, empty session, no project files),
 say so and ask the user what they had in mind. Don't fabricate a tour.
@@ -86,7 +105,9 @@ Once scope is picked, derive:
 
 - **SCOPE_LABEL** — short human-readable name (e.g. `branch`, `session`, `pr-1234`)
 - For diff-scoped tours: **SCOPE_RANGE** (`<base>..HEAD`), the file list via
-  `git diff --stat <range>`, and the commit list via `git log --oneline <range>`
+  `git diff --name-status <range>` (not `--stat`, which abbreviates long paths
+  to `.../…` and renders renames as `{old => new}` — display forms, not real
+  paths), and the commit list via `git log --oneline <range>`
 - For **session-scoped tours**: introspect your own conversation history to
   answer "what work did I do in this conversation that is worth touring?"
   Build:
@@ -145,11 +166,15 @@ You are *curating* — read enough of the diff or codebase to pick stops well.
 Read the diff in full once at the start of a diff-scoped tour.
 
 For large scopes (whole codebase, big diffs), it's fine to delegate exploration
-to a sub-agent (e.g. `Explore`) to keep main context tight — but you write the
-tour yourself. The sub-agent reports back with file lists, key class/function
-names, and rough sizes; you decide which to spotlight.
+to a sub-agent (e.g. `Explore`, explicit `model:` per the delegation policy) to
+keep context tight — but whoever owns the tour (main agent, or the cold-scope
+builder from § Who builds it) writes it. The sub-agent reports back with file
+lists, key class/function names, and rough sizes; you decide which to spotlight.
 
 ### Step 4 — Write and surface
+
+(For a cold-scope tour the delegated builder only *writes*; everything after the write
+— server, URL, file-share — is the dispatcher's, per "Who builds it".)
 
 **HTML (default).** Write the self-contained page(s) to OUTPUT_PATH, then start
 a simple static server (e.g. `python3 -m http.server <port>
@@ -195,6 +220,14 @@ the set is movable as a unit. Markdown stays single-file.
 If the chosen path already exists, append `-2`/`-3`/... (or `-tour-2/` for a
 set) so the older tour survives.
 
+**Commit what lands in `plans/`.** In a git checkout, commit a tour written
+under `plans/` right after writing it (`git add <path> && git commit -m
+"plans: <name> tour" -- <path>` — the pathspec keeps any staged user work in
+a reused worktree out of the tour commit) — the plans convention's sidecar rule, and uncommitted
+tour files strand reused worktrees against commands whose preflights bail on
+dirt (auto-merge-main Step 3). Outputs elsewhere (`docs/`, repo root) stay
+uncommitted for the user to place. No push — the branch owns push timing.
+
 If the worktree is not a git repo, fall back to `--codebase` or `--path`
 scoping; warn the user that diff-scoped tours need git.
 
@@ -231,7 +264,10 @@ absolute-from-workspace-root form:
 
 The page should be genuinely nice to look at — not a markdown-to-HTML dump.
 Aim for the bar in the `frontend-design` skill: distinctive, polished, not
-generic-AI. Requirements:
+generic-AI. Start from the visual-page design system
+(`~/.claude/scripts/visual-page/` — its palette, cards, callouts) rather than
+inventing a parallel style; the tour-specific layout below extends it.
+Requirements:
 
   - **Self-contained.** Inline all CSS (and any small JS) in the file — no CDN
     links, no blocking external fonts; a system font stack is fine. A
