@@ -33,12 +33,25 @@
 - **Dual-review**: no (Tier 1 — the goal text itself makes the gate non-negotiable)
 - **Journal ref**: S2 2026-07-20T06:08Z
 
-## D004 — config-change skill: include/exclude (PENDING dual-review)
-- **When**: opened 2026-07-20T06:10Z — verdict pending
+## D005 — S3b verify #5: intent reading over literal reading (skip-heredocs stay unquoted)
+- **When**: 2026-07-20T07:05Z — during S3b acceptance review
+- **Question**: My verify criterion said "no unquoted heredoc anywhere in either file", but the live source deliberately keeps two skip-comment heredocs unquoted (bodies interpolate only run-controlled SHAs/dates — no third-party text), and the ported explainer text states that contrast explicitly. Enforce the literal criterion or the intent?
+- **Options**:
+  - A. Literal — convert the two skip heredocs to quoted+printf too; diverges from live and contradicts the ported explainer
+  - B. Intent — the audited vulnerability was third-party (PR-derived) text reaching an expanding heredoc; the PR-comment assembly is the quoted+body-file+printf pattern; run-controlled-only heredocs are safe by the campaign's own analysis
+- **Chosen**: B. Faithful-port principle wins; my verify wording was overly broad. The stage-runner read the intent correctly and correctly declined to make the divergence itself.
+- **Reversibility**: trivial
+- **Dual-review**: no (Tier 1 — the live config's own audit already adjudicated this exact boundary)
+- **Journal ref**: S3b acceptance 2026-07-20T07:05Z
+
+## D004 — config-change skill: ship as a NON-INSTALLED reference doc (C)
+- **When**: 2026-07-20T06:32Z — during S2 (opened 06:10Z)
 - **Question**: Ship the new config-change skill (the config-maintenance discipline), and if so in what form?
 - **Options**:
-  - A. Ship generalized as a 5th installed skill (investigator's recommendation — "the natural home of the improvement-loop thesis")
-  - B. Exclude the artifact; cover it in README improvement-loop prose (orchestrator's lean — its load-bearing content is coupled to private infrastructure: the audit-workspace paths, routing page, dotfiles-manager matrix; a generalized rewrite is an artifact that never ran)
-  - C. Ship as a non-installed reference doc alongside CLAUDE-global.md (merge-by-choice precedent; install.sh doesn't walk it)
-- **Chosen**: _pending_
-- **Dual-review**: yes — in flight (Opus critic + Codex CLI critic, critique mode, parallel)
+  - A. Ship generalized as a 5th installed skill — operationalizes the guide's improvement-loop thesis, but the generalized rewrite never ran and its procedure dead-ends on infrastructure adopters lack
+  - B. Exclude the artifact; README improvement-loop prose only — honest but withholds the concrete procedure
+  - C. Ship as a non-installed reference doc (the CLAUDE-global merge-by-choice pattern) — fidelity without a dead-end install
+- **Chosen**: C — as `docs/config-change-reference.md`, framed "reference-only worked procedure — not installed, not runnable unmodified", with a preamble mapping owner-specific mechanisms to portable roles (canonical fact store · carrier inventory + cite/vocabulary search · persistence mechanism · routing documentation · audit log + changelog cursor). Placement outside `skills/` is load-bearing: install.sh walks all of `skills/` with no per-artifact allowlist, so a skills/ placement silently becomes option A at install time (Codex catch). Installed-skills count stays 4. Knock-on edits owned by S3e: narrow the repo CLAUDE.md matrix promise ("one row per shipped artifact" → installed/runnable artifacts + a reference-doc mention), tighten the README claim "nothing shipped depends on owner infrastructure" → "no installed artifact depends on it", add the doc to README's deliberately-not-installed list + install.sh's header comment. No config-change pointer line goes into CLAUDE-global.md (a config file referencing a repo doc would dangle post-merge; the README section + reference doc carry the thesis).
+- **Reversibility**: trivial pre-merge
+- **Dual-review**: yes — CONVERGED. Claude (Opus): C, high confidence — repo's own precedent; installed skill dead-ends; lightest doc ripple. Codex (0.144.4, job 1784527957-890123-25964, exit=0): C, high (0.95) — same core reasons plus the three implementation constraints adopted above.
+- **Journal ref**: S2 2026-07-20T06:32Z
