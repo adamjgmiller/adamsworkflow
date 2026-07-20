@@ -14,12 +14,12 @@ Examples:
 
 ## Step 0 — Parse `$ARGUMENTS`
 
-- **PR numbers** (optional): zero or more positive integers (dedupe repeats — two per-PR agents on the same PR would share one worktree).
+- **PR numbers** (optional): zero or more positive integers (dedupe repeats — two per-PR agents on the same PR would share one worktree; likewise, PRs sharing one head branch — GitHub allows several PRs from one branch to different bases — share a checkout: serialize that group through one agent at a time).
 - **No args** → resolve the PR for the current branch:
   ```bash
-  gh pr view --json number,headRefName,baseRefName,isDraft,url,headRepositoryOwner,headRepository
+  gh pr view --json number,state,headRefName,baseRefName,isDraft,url,headRepositoryOwner,headRepository
   ```
-  If this fails (no PR for the branch), bail with the error.
+  If this fails (no PR for the branch), bail with the error. If `state` isn't `OPEN`, bail too — gh's branch→PR resolution is not open-only (a stale worktree happily resolves its long-merged PR, exit 0), and the run would otherwise review, push to, and comment on a dead PR.
 - State the parsed plan back in one line.
 
 ## Step 1 — Pre-flight
@@ -29,7 +29,13 @@ Hard blockers — bail with one clear error:
 ```bash
 git rev-parse --git-dir >/dev/null
 gh repo view --json nameWithOwner >/dev/null
-for N in <prs>; do gh pr view "$N" --json number,title,state,isDraft,headRefName,baseRefName,url >/dev/null; done
+# gh pr view exits 0 for MERGED/CLOSED PRs too (probe-verified, gh 2.93) — the
+# state test, not the exit code, is the open-PR gate; the exit code only
+# catches missing/inaccessible PRs.
+for N in <prs>; do
+  STATE=$(gh pr view "$N" --json state --jq .state) || exit 1
+  [ "$STATE" = "OPEN" ] || { echo "PR #$N state=$STATE — not open"; exit 1; }
+done
 ```
 
 Soft blockers — warn and continue:
@@ -40,13 +46,13 @@ Soft blockers — warn and continue:
 
 **Always spawn one `general-purpose` per-PR review-agent per PR — including when there's only one.** Even a single-PR run delegates: Steps 3–16 generate heavy intermediate volume (per-lens fan-out, fix loop, test runs) for a ~30-line report block, and a `general-purpose` sub-agent holds the `Agent` tool (Task fabric — it can spawn its own children; `~/.claude/docs/field-notes.md` §1), so the per-PR agent runs Step 7's fan-out and Step 9's fix loop itself. The main loop is a thin dispatcher from here: dispatch, wait, assemble (Step 17). Dispatch each per-PR agent with an explicit `model:` — default `opus` (conductor); escalate a given PR's agent to `fable` only when that PR may warrant a Fable lens in Step 7 (the per-lens ceiling is the per-PR agent's own tier, so an implicitly-Opus conductor can never grant one); never leave it to inheritance — an unpinned dispatch inherits the session model (auto-Fable on a Fable session).
 
-Each per-PR agent's brief: *"Follow `~/.claude/commands/pr-auto-review.md` from Step 3 onward for PR #N. Anchor every Bash call to the worktree you set up in Step 3 (`cd` it first in each call, or `git -C`) — your cwd resets between calls (field-notes §2). You are a stage-agent: fan out Step 7's lens reviewers as your own children and run Step 9's fix loop inline. All side effects are yours — the Step 12 push, Step 13's `gh pr ready`, and the Step 14 comment with its `before=`/`after=` footer happen inside you, never in your dispatcher. Codex available: <yes|no> (the dispatcher's Step 1 check) — if no, skip the codex-runner children, run lenses Opus-only, and note the degradation in your Step 14 comment. When done, **`SendMessage` your Step 16 per-item report block to your dispatcher** as your final act — don't just finish and go idle. A backgrounded teammate's plain-text return is NOT auto-routed to the dispatcher, so a silent finish leaves the dispatcher having to ping you for the report it's waiting on."*
+Each per-PR agent's brief: *"Follow `~/.claude/commands/pr-auto-review.md` from Step 3 onward for PR #N. Anchor every Bash call to the worktree you set up in Step 3 (`cd` it first in each call, or `git -C`) — your cwd resets between calls (field-notes §2). You are a stage-agent: fan out Step 7's lens reviewers as your own children and run Step 9's fix loop inline. All side effects are yours — the Step 12 push, Step 13's `gh pr ready`, and the Step 14 comment with its `before=`/`after=` footer happen inside you, never in your dispatcher. Codex available: <yes|no> (the dispatcher's Step 1 check) — if no, skip the codex-runner children, run lenses Opus-only, and note the degradation in your Step 14 comment. Force-rerun requested: <yes|no> (the invoker's explicit ask — Step 4's Force-rerun note) — if yes, skip Step 4's idempotency bail per that note. Finish by returning your Step 16 per-item report block as your final message — it auto-delivers to your dispatcher in your completion task-notification (field-notes §4)."*
 
-Keep the brief's SendMessage-final-act line — a named spawn is mailbox plumbing whose final plain-text turn is not reliably surfaced (field-notes §4). Step 7's unnamed lens children auto-deliver their results via completion task-notifications; a named per-PR teammate does not — the explicit SendMessage is its one reliable return channel.
+Dispatch per-PR agents **unnamed** (no `name:` param): an unnamed child's final text arrives in its result-carrying completion task-notification — the structurally reliable channel — and an unnamed agent's own Step 7 dispatches stay genuinely async/parallel. Never name one: a named teammate's own dispatches run synchronous and assume-serialized, and its plain-text finish doesn't surface reliably (field-notes §4). Count dispatches and reconcile arrivals against the count before Step 17 assembles.
 
 **Concurrency cap: at most 4 per-PR agents at a time** (waves of 4, or dispatch the next as one returns). The cap is counted in PRs, but account for **within-PR fan-out**: the real concurrent-agent number is PRs × (lens children + codex-runner children) — at 4 PRs × ~4 lens pairs that's ~32 children on top of the 4 per-PR agents. Platform behavior past its comfort point is unverified (field-notes §6) — stay under budget: if 4 at a time proves tight in practice, drop to 3; trim the lens set before blowing past it.
 
-No `Agent` tool in your own toolset (e.g. this file reached via a Workflow agent's Skill tool)? Then you can't spawn — run Steps 3–16 inline yourself, one PR at a time: Step 7's lens passes run sequentially in your own context with the Codex side as detached gotcha‑3 Bash launches (per codex-consult SKILL.md), and for Step 9, replace `/review-fix-loop` with one inline `/dual-review` pass handed the explicit scope `<PR_BASE_SHA>...<FANOUT_HEAD>` — the same frozen range Step 7 computes on this path too; without it dual-review's own ladder anchors at merge-base with `main`, wrong for a PR based elsewhere (its single path needs no `Agent` tool; expect the `concurrent single-process dual-source` label), then apply the meaningful findings (Step 9's criteria) yourself with minimal targeted edits **and commit them per the repo's commit convention** before Step 10 — `/review-fix-loop` itself has no `Agent`-less mode (every lane spawns). Capability is detected, never assumed.
+No `Agent` tool in your own toolset (e.g. this file reached via a Workflow agent's Skill tool)? **Bail before any side effect** with a clear error: this command requires the Task fabric — re-run it from the main loop or a spawn-capable stage-agent. There is no degraded inline mode (capability is detected, never assumed; the fan-out, fix loop, and promotion contract all presume spawning).
 
 Wait for all per-PR agents, then assemble the final report (Step 17). When you hold `Agent`, never run Steps 3–16 in the main loop.
 
@@ -58,7 +64,7 @@ The rest is the per-PR workflow — everything below runs inside the per-PR agen
 git worktree list --porcelain
 ```
 
-Parse to find a worktree on the PR's **local ref** — `headRefName` for a same-repo PR, `pr-<N>` for a fork (the `LOCAL_REF` naming below; matching a fork by `headRefName` misses its worktree and the duplicate `worktree add` then fails). If found → `cd` there; **stash any uncommitted changes first** (the WIP paragraph below — a dirty tree would also make the sync's ff spuriously fail), then sync: set `PR_BRANCH` (= `headRefName`) and, for a fork, `FORK_REMOTE` (= `pr-<N>-fork`; the create path below defines both — the reuse path needs them too, for this fetch and Step 12's push), fetch the PR head (from `origin`, or `FORK_REMOTE`), then `git merge --ff-only FETCH_HEAD` — a reused worktree is stale by default, and Step 4 comparing a stale HEAD falsely bails past an author push. If the ff fails (unpushed prior-run commits), note it and use the fetched remote head as Step 4's comparand.
+Parse to find a worktree on the PR's **local ref** — `headRefName` for a same-repo PR, `pr-<N>` for a fork (the `LOCAL_REF` naming below; matching a fork by `headRefName` misses its worktree and the duplicate `worktree add` then fails). If found → `cd` there; **stash any uncommitted changes first** (the WIP paragraph below — a dirty tree would also make the sync's ff spuriously fail), then sync: set `PR_BRANCH` (= `headRefName`) and, for a fork, `FORK_REMOTE` (= `pr-<N>-fork`; the create path below defines both — the reuse path needs them too, for this fetch and Step 12's push), fetch the PR head (from `origin`, or `FORK_REMOTE`), then `git merge --ff-only FETCH_HEAD` — a reused worktree is stale by default, and Step 4 comparing a stale HEAD falsely bails past an author push. Verify the sync by comparing `git rev-parse HEAD` to `git rev-parse FETCH_HEAD` afterward — an ff *failure* only signals divergence, while a HEAD merely **ahead** of the fetched head (unpushed prior-run commits, e.g. the fork patch-fallback strand) makes the ff succeed as a silent "Already up to date" no-op (probe-verified). If HEAD ≠ fetched head either way (the **unsynced reuse path**), note it and use the fetched remote head as Step 4's comparand.
 
 If not found, create a worktree under `.claude/worktrees/`. Never use `gh pr checkout` — it would check out in the main repo checkout, which is forbidden. Fetch via git directly:
 
@@ -129,7 +135,7 @@ Remember `LOCAL_REF` and (for fork) `FORK_REMOTE` — push in Step 12 needs them
 
 Hold `WORKTREE` as an absolute path and anchor **every** subsequent git/test command in Steps 4–14 to it — `cd "$WORKTREE"` at the start of each Bash call, or `git -C "$WORKTREE"`. The snippet above ends in a `cd`, but cwd resets between Bash calls; an unanchored later call silently targets the session-default checkout (field-notes §2).
 
-If the (reused) worktree has uncommitted changes, **respect them** — presumably the user's in-flight work. Record the dirty set in the decision log, then **stash it for the run, before the sync above** (`git -C "$WORKTREE" stash push --include-untracked -m "pr-auto-review #<N>: user WIP"`): reviewers' contextual reads, tests, and commits all want the clean PR state, and the fix loop's checkpoint would otherwise sweep the WIP into commits Step 12 pushes. Restore as the run's **last worktree act — immediately after Step 12 (so the outcome is known before the Step 14 comment), and on every earlier exit, including a Step 4 bail** — popping **this run's entry by its message** from `git stash list`, with `--index` (preserves the staged/unstaged split): the stash stack is shared across linked worktrees, so a blind `git stash pop` under concurrent per-PR agents can grab a sibling's WIP. If the pop conflicts with the run's fixes, leave the stash in place and flag it in the Step 14 comment and Step 16 Notes — never force-resolve user work.
+If the (reused) worktree has uncommitted changes, **respect them** — presumably the user's in-flight work. Record the dirty set in the decision log, then **stash it for the run, before the sync above** (`flock "${GIT_COMMON}/claude-stash.lock" git -C "$WORKTREE" stash push --include-untracked -m "pr-auto-review #<N>: user WIP"` — same flock-or-fallback convention as the worktree-add lock): reviewers' contextual reads, tests, and commits all want the clean PR state, and the fix loop's checkpoint would otherwise sweep the WIP into commits Step 12 pushes. Restore as the run's **last worktree act — immediately after Step 12 (so the outcome is known before the Step 14 comment), and on every earlier exit, including a Step 4 bail** — popping **this run's entry by its message**, with `--index` (preserves the staged/unstaged split), as **one atomic critical section under the same `claude-stash.lock`**: resolve `stash@{n}` by message from `git stash list` and pop it within a single locked command. The stash stack is shared across linked worktrees and indices shift whenever any concurrent per-PR agent pushes or pops — an unlocked lookup-then-pop can land on a sibling's entry even with the message check (a blind `git stash pop` is worse still). If the pop conflicts with the run's fixes, leave the stash in place and flag it in the Step 14 comment and Step 16 Notes — never force-resolve user work.
 
 Never check out the PR's branch in the main repo checkout.
 
@@ -148,9 +154,11 @@ This command is expensive (per-lens fan-out, multiple Opus + Codex calls, /revie
 
 ```bash
 # Capture HEAD at the very start of this run — this is the "before" SHA we'll commit to the footer if we proceed, and the SHA we compare against the prior run's "before".
-# Step 3's reuse-path sync makes local HEAD the PR's real head; if that sync couldn't
-# fast-forward, use the fetched remote head OID here instead — BEFORE_SHA must reflect
-# what the PR actually points at, not a stale checkout.
+# Step 3's reuse-path sync makes local HEAD the PR's real head; if it left HEAD ≠
+# fetched head (divergence ff-fail, or the silent ahead-only "Already up to date"
+# no-op — the unsynced reuse path), use the fetched remote head OID here instead —
+# BEFORE_SHA must reflect what the PR actually points at, not a stale or
+# strand-carrying checkout.
 BEFORE_SHA=$(git rev-parse --short HEAD)
 
 # Find the most recent /pr-auto-review comment on this PR and parse its `before=` SHA from the footer.
@@ -159,7 +167,10 @@ BEFORE_SHA=$(git rev-parse --short HEAD)
 LAST_BEFORE_SHA=$(gh api "repos/:owner/:repo/issues/<N>/comments" --paginate \
   --jq '[.[] | select(.body | test("Generated by `/pr-auto-review .*` via Claude Code @ before="))]
         | sort_by(.created_at) | last | .body' \
-  | grep -oE 'before=[0-9a-f]+' | head -1 | sed 's/before=//')
+  | grep -oE 'before=[0-9a-f]+' | tail -1 | sed 's/before=//')
+# tail, not head: --paginate runs the --jq filter per page (one matching body per page,
+# oldest page first) — tail takes the newest match; head would pin an old run's before=
+# forever on >100-comment PRs, silently defeating this cost guard.
 ```
 
 Four cases:
@@ -171,7 +182,7 @@ Four cases:
    ```bash
    # Plans-only delta? Guard first: the prior before= SHA may no longer exist locally
    # (force-push rewrote history) — then it is NOT plans-only; fall through to case 4.
-   # Diff to $BEFORE_SHA, not HEAD: on the ff-fail reuse path BEFORE_SHA is the fetched
+   # Diff to $BEFORE_SHA, not HEAD: on the unsynced reuse path BEFORE_SHA is the fetched
    # remote head — diffing to stale local HEAD would bail right past an author push.
    if git cat-file -e "${LAST_BEFORE_SHA}^{commit}" 2>/dev/null \
       && [ -z "$(git diff --name-only "$LAST_BEFORE_SHA" "$BEFORE_SHA" -- . ':!plans/')" ]; then
@@ -181,6 +192,8 @@ Four cases:
 
 4. **`BEFORE_SHA != LAST_BEFORE_SHA`** otherwise → something changed (author push, merge-main push, prior-run fix push, force-push). Proceed to Step 5 with a fresh review.
 
+**Force-rerun**: this check is a cost guard, not a gate. When the invoker explicitly asks for a re-review despite no code change ("force", "re-review anyway", new comments landed since the plans-only run), skip the bail, proceed to Step 5, and note the forced run in the Step 14 comment.
+
 For either bail case (#2 or #3): restore any Step 3 stash first (its every-exit rule — a pop conflict gets a line in the comment), then post the comment below and return the skip block:
 
 ```bash
@@ -189,7 +202,7 @@ gh pr comment <N> --body "$(cat <<EOF
 
 **Skipped**: nothing reviewable has changed in this PR since the last /pr-auto-review run started (HEAD is at \`$BEFORE_SHA\`; any delta from \`$LAST_BEFORE_SHA\` touches only \`plans/\` — the prior run's own record append). A fresh review would produce identical output.
 
-If you want to force a re-run (e.g., the lens set needs to expand or you suspect the last run missed something), push a \`--allow-empty\` commit, then re-invoke.
+If you want to force a re-run (e.g., the lens set needs to expand, new review comments landed, or you suspect the last run missed something), re-invoke with an explicit force instruction — an \`--allow-empty\` commit alone changes no files and still bails via the plans-only case.
 
 ---
 *Generated by \`/pr-auto-review <N>\` via Claude Code @ before=$BEFORE_SHA after=$BEFORE_SHA.*
@@ -236,9 +249,9 @@ gh pr view <N> --json reviews                                # review submission
 
 Collect findings from:
 
-- **Known bots**: Codecov, GitHub Advanced Security (`github-advanced-security`), Sourcery, Snyk, and whatever review bot your repos actually run — pattern-match on author login. (Never expect or wait for a bot your repos don't use.)
+- **Known bots**: Codecov, GitHub Advanced Security (`github-advanced-security`), Sourcery, Snyk, and whatever review bot your repos actually run — pattern-match on author login. A review bot's login appears bare in `--json reviews`, but REST comment authors carry a `[bot]` suffix (e.g. `<bot-login>[bot]`) — match both forms. (Never expect or wait for a bot your repos don't use.)
 - **Human reviewers**: unresolved inline comments and review submissions marked `CHANGES_REQUESTED` or with substantive findings.
-- **Skip resolved threads** (`gh api .../pulls/N/comments` returns `in_reply_to_id` / `state`; treat resolved threads as already addressed).
+- **Skip resolved threads** — thread-resolution state lives only in GraphQL (the REST comments endpoint's `in_reply_to_id` only groups replies; it carries no resolution field): fetch the PR's `reviewThreads { isResolved, comments }` via `gh api graphql` and drop comments in resolved threads — they're already addressed.
 - **Skip prior `/pr-auto-review` comments** — those are the agent's own output, not new findings (Step 4's idempotency check already handled "is there anything new since last run").
 
 Each scraped finding becomes a candidate issue with `source: <reviewer-login>` attribution. These feed Step 8's dedup.
@@ -277,9 +290,9 @@ For each chosen lens, spawn **paired Opus + Codex review sub-agents in parallel*
 
 **Codex lens reviewer** — dispatch the named **`codex-runner`** agent, one per lens. Its definition (`~/.claude/agents/codex-runner.md`) carries the full runner contract — follow codex-consult SKILL.md gotchas 1–4, run `review` mode, never skip, never fall back to its own review, return the `JOB_ID` + sentinel `exit=N` + findings verbatim — so the dispatch prompt supplies only the variables: the `<PR_BASE_SHA>...<FANOUT_HEAD>` scope, the `<WORKTREE>` to run in (`cd` there before launching `codex exec` — Codex's contextual file reads must hit the PR tree, not the session-default checkout), the lens constraint, and — for the **goal-fit** lens — the same PR intent the Opus brief embeds (Codex can't infer the authoritative goal; the def folds supplied context into the Codex prompt verbatim). Each lens still gets its own `JOB_ID`. If the agent type is unknown ("Agent type not found" — stale session registry; defs load at session start), dispatch a `general-purpose` child briefed to read and follow the def file as its full contract, plus the same variables — and pin that child `model: sonnet` (Codex-driver; the def's frontmatter pin does NOT transfer when the def is merely read as prose).
 
-Capture the pre-fan-out baseline first — `FANOUT_HEAD=$(git -C "$WORKTREE" rev-parse HEAD)`; refresh the base (`git -C "$WORKTREE" fetch origin "<baseRefName>"` — a stale `origin/<baseRefName>` folds upstream commits the PR already merged into the range as if they were PR content), then `PR_BASE_SHA=$(git -C "$WORKTREE" merge-base HEAD "origin/<baseRefName>")`; plus the current dirty set (`git -C "$WORKTREE" status --porcelain` — normally empty after Step 3's stash). Every reviewer gets the **one immutable range** `<PR_BASE_SHA>...<FANOUT_HEAD>` — don't brief leaves with live `gh pr diff`, which re-reads the remote per leaf and drifts if the author pushes mid-run. Then launch all lens reviewers in parallel: single message with all the Agent calls (one Opus + one codex-runner per lens). Dispatches are async (async-only at depth — field-notes §4): each Agent call returns a launch handle immediately, and each child's findings arrive as a task-notification carrying its final text — attached to your next tool result, or re-waking you if you've ended your turn. Count the dispatches (2 × |lenses|; |lenses| when Codex is unavailable and only Opus children launched) and reconcile arrivals against that count before Step 8 — join only when every lens pair has reported; the risk is joining on partial results or double-dispatching a slow lens, not stalling. Slot math: routing Codex through codex-runner children turns what used to be slot-free detached Bash launches into real agent slots — 2 × |lenses| concurrent children for this PR — which is exactly the within-PR fan-out Step 2's cap budgets for.
+Capture the pre-fan-out baseline first — `FANOUT_HEAD=$(git -C "$WORKTREE" rev-parse HEAD)` plus the checked-out ref (`git -C "$WORKTREE" symbolic-ref -q HEAD`); refresh the base (`git -C "$WORKTREE" fetch origin "<baseRefName>"` — a stale `origin/<baseRefName>` folds upstream commits the PR already merged into the range as if they were PR content), then `PR_BASE_SHA=$(git -C "$WORKTREE" merge-base HEAD "origin/<baseRefName>")`; plus the current dirty set (`git -C "$WORKTREE" status --porcelain` — normally empty after Step 3's stash). Every reviewer gets the **one immutable range** `<PR_BASE_SHA>...<FANOUT_HEAD>` — don't brief leaves with live `gh pr diff`, which re-reads the remote per leaf and drifts if the author pushes mid-run. Then launch all lens reviewers in parallel: single message with all the Agent calls (one Opus + one codex-runner per lens). Dispatches are async (async-only at depth — field-notes §4): each Agent call returns a launch handle immediately, and each child's findings arrive as a task-notification carrying its final text — attached to your next tool result, or re-waking you if you've ended your turn. Count the dispatches (2 × |lenses|; |lenses| when Codex is unavailable and only Opus children launched) and reconcile arrivals against that count before Step 8 — join only when every lens pair has reported; the risk is joining on partial results or double-dispatching a slow lens, not stalling. Slot math: routing Codex through codex-runner children turns what used to be slot-free detached Bash launches into real agent slots — 2 × |lenses| concurrent children for this PR — which is exactly the within-PR fan-out Step 2's cap budgets for.
 
-**Worktree-integrity check (defense in depth — the lens reviewers are briefed read-only, but verify rather than trust).** Once the fan-out returns, diff against the baseline captured at launch (`FANOUT_HEAD` + the Step 3 dirty set): porcelain shows nothing beyond the captured Step 3 set, and HEAD still equals `FANOUT_HEAD`. If a reviewer leaked edits, restore **only paths that were clean at baseline** (`git restore <those-paths>` — never a path in the captured user-dirty set); if HEAD moved, `git reset --soft "$FANOUT_HEAD"` and review the now-staged stray diff, discarding only baseline-clean paths. If a stray edit lands in a file the user already had dirty (can't be cleanly separated), **stop and flag it in the decision log rather than force a restore** — losing the user's in-flight work is worse than a dirty review. Record any restoration before the fix loop runs; a dirty tree carried into Step 9 would sweep stray edits into the fix commit.
+**Worktree-integrity check (defense in depth — the lens reviewers are briefed read-only, but verify rather than trust; this paragraph is the canonical integrity machinery — lens-review cites it).** Once the fan-out returns, diff against the baseline captured at launch (`FANOUT_HEAD` + the captured baseline dirty set — in this file's flow, Step 3's capture): porcelain shows nothing beyond that captured set, and HEAD still equals `FANOUT_HEAD`. (Citing flows run every command here anchored to their worktree — `git -C "$WORKTREE"`.) (The porcelain compare catches new paths and status changes only — a content-only edit inside an already-dirty path is invisible to it; the read-only briefing is the real guarantee there.) If a reviewer leaked edits, restore **only paths that were clean at baseline** (`git restore --staged --worktree -- <those-paths>` — plain `restore` pulls from the index, so a *staged* leak survives it; delete reviewer-created untracked files; never touch a path in the captured user-dirty set); if HEAD moved and the checked-out ref still matches the captured baseline ref, `git reset --soft "$FANOUT_HEAD"` and review the now-staged stray diff, discarding only baseline-clean paths. If instead the *ref* changed (a leaf switched branches or detached HEAD), record the stray ref and its tip OID before touching anything, switch back to the baseline ref, and re-compare HEAD to `FANOUT_HEAD` — reset --soft only if it still differs: a post-switch reset stages nothing from the stray ref (the leak lives on *that* ref, so the reset is a silent no-op here, and resetting the stray branch itself would rewrite its tip). Review the leaked commits via `git diff "$FANOUT_HEAD" <stray-tip-OID>` and flag the stray ref in the decision log; the recorded OID also keeps a detached stray commit reviewable after the switch abandons it. If a stray edit lands in a file the user already had dirty (can't be cleanly separated), **stop and flag it in the decision log rather than force a restore** — losing the user's in-flight work is worse than a dirty review. Record any restoration before the fix loop runs; a dirty tree carried into Step 9 would sweep stray edits into the fix commit.
 
 ## Step 8 — Dedup + validate
 
@@ -300,7 +313,7 @@ Determine what's **meaningful** to fix:
 - `medium` / `low` / `nit` — fix if low-effort + low-risk.
 - Anything ambiguous (don't know if it's a real issue, fix is risky, scope expansion) → don't fix; document in the PR comment.
 
-If the meaningful set is empty → skip to Step 10 (test pre-check), then Steps 11–14 (plans append, push, promote check, post comment). The push still happens — it carries the plans commit; with no fix commits, `FIX_SHA == FANOUT_HEAD` records the no-code-change state (`== BEFORE_SHA` too on the normal path), and the next run bails via Step 4's plans-only case.
+If the meaningful set is empty → skip to Step 10 (test pre-check), then Steps 11–14 (plans append, push, promote check, post comment). The push still happens — it carries the plans commit; with no fix commits, `FIX_SHA == FANOUT_HEAD` records the no-code-change state (on the normal path that's also the commit Step 4 captured as `BEFORE_SHA` — same commit, shorter abbreviation), and the next run bails via Step 4's plans-only case.
 
 Otherwise, run `/review-fix-loop /dual-review` to apply fixes — **inline, in your own context**: read and execute `~/.claude/commands/review-fix-loop.md` yourself (the proven follow-the-file pattern), don't dispatch it as a sub-agent. Inline invocation collapses a depth level (Agent dispatch = +1, inline command = +0; field-notes §5), so the composed chain stays at `main(0) → per-PR agent(1) → fix-loop's 2a review sub-agent(2)` — 2 levels (dual-review spawns no codex child; its Codex side runs as detached Bash inside the review sub-agent). Dispatching the loop as its own sub-agent would push the chain to 3 — avoid that unless your own context is critically tight. Brief: pass the deduped, validated findings list as the loop's **Seed findings** (its Step 0 input) — round 1 buckets your list directly instead of dispatching a redundant review — plus an explicit scope, **`scope <PR_BASE_SHA>`**: rounds 2+ then review the PR's actual range, where the loop's own clean-tree fallback would anchor at merge-base with `main` (wrong for a PR based elsewhere). Trust the loop's internal convergence (max-rounds=5, hard ceiling 10).
 
@@ -332,7 +345,7 @@ Per the global CLAUDE.md worktree-plans convention. Always create-or-append `pla
 Capture the post-fix HEAD first — the plans section records it as its After SHA, and Step 12's fork fallback ends its patch range at it. (The section can't record the SHA of the plans commit itself — that commit doesn't exist until after the file is written; the plans append sits deliberately outside the recorded bracket.)
 
 ```bash
-FIX_SHA=$(git rev-parse --short HEAD)
+FIX_SHA=$(git rev-parse HEAD)   # full OID — the no-fix signal is the literal compare FIX_SHA == FANOUT_HEAD, and Step 7 captured FANOUT_HEAD full; a --short capture here would never string-equal it
 ```
 
 Append a dated section:
@@ -340,7 +353,7 @@ Append a dated section:
 ```markdown
 ## /pr-auto-review run, <YYYY-MM-DD>
 
-**Before SHA**: `<BEFORE_SHA>` (the PR head this run started from — local HEAD except on the ff-fail reuse path)
+**Before SHA**: `<BEFORE_SHA>` (the PR head this run started from — local HEAD except on the unsynced reuse path)
 **After SHA**: `<FIX_SHA>` (HEAD after any fix/test-fix commits, before this plans append; same as `FANOUT_HEAD` if no fixes)
 **Lenses run**: <list>
 **Sources scraped**: <list of reviewer logins>
@@ -371,7 +384,7 @@ Always name remote and refspec. A bare `git push` from the fork's local `pr-<N>`
 
 Failure handling:
 
-- **Permission denied (fork without maintainer-edit)** → don't retry. Collect the fix commits' diffs (`git format-patch $FANOUT_HEAD..$FIX_SHA --stdout` — `FANOUT_HEAD`, not `BEFORE_SHA`: on the ff-fail reuse path `BEFORE_SHA` is the remote head, and a range from it would re-post a prior run's stranded fixes and plans commit; ending at `FIX_SHA` keeps this run's plans commit out of the patches) and prepare them for inclusion in the PR comment (Step 14). Mark the PR as `couldNotPush: true` in the report block.
+- **Permission denied (fork without maintainer-edit)** → don't retry. Collect the fix commits' diffs (`git format-patch $FANOUT_HEAD..$FIX_SHA --stdout > "$PATCH_FILE"` — Step 14's Patches append `cat`s this file — `FANOUT_HEAD`, not `BEFORE_SHA`: on the unsynced reuse path `BEFORE_SHA` is the remote head, and a range from it would re-post a prior run's stranded fixes and plans commit; ending at `FIX_SHA` keeps this run's plans commit out of the patches) and prepare them for inclusion in the PR comment (Step 14). Record `Push: comment-with-patches` in the report block (Step 16's field).
 - **Push rejected (non-fast-forward)** → the PR branch moved underneath us (author or another tool pushed). Re-fetch from the push remote (`git -C "$WORKTREE" fetch origin "$PR_BRANCH"`, or `"$FORK_REMOTE"` for a fork), examine the divergence. If trivial (rebase onto theirs), do it and retry push — **and leave the PR draft** (Step 13): the rebased combination is code no lens or test run examined. (The plans entry's recorded SHAs predate the rebase — leave them; the footer's `after=` reflects the actually-pushed head.) If non-trivial → bail on the push, note in the comment with rationale.
 
 Capture the final HEAD on **every** path — success, fork patches-in-comment fallback, or non-ff bail (the Step 14 footer needs it):
@@ -380,14 +393,14 @@ Capture the final HEAD on **every** path — success, fork patches-in-comment fa
 AFTER_SHA=$(git rev-parse --short HEAD)
 ```
 
-`AFTER_SHA` is the `after` half of the footer (Step 14) — the final HEAD this run produced (the pushed HEAD when the push succeeded; on the fork-patches or non-ff-bail paths it's local-only — say so in the comment rather than implying it was pushed), plans commit included, so it always sits at least one commit past `FANOUT_HEAD` (and past `BEFORE_SHA` on the normal path — on the ff-fail reuse path `BEFORE_SHA` is the remote head and serves *only* the idempotency compare and the footer; every local-range use anchors on `FANOUT_HEAD`). "This run changed no code" is signaled by the plans record's `FIX_SHA == FANOUT_HEAD`, not by `after == before`; convergence to the cheap skip comes from Step 4's plans-only case, not from HEAD standing still. The `before` half is `BEFORE_SHA` from Step 4, still in scope — the next run's idempotency check parses it, and capturing `before` as "where we started, not where we ended" remains the load-bearing semantic.
+`AFTER_SHA` is the `after` half of the footer (Step 14) — the final HEAD this run produced (the pushed HEAD when the push succeeded; on the fork-patches or non-ff-bail paths it's local-only — say so in the comment rather than implying it was pushed), plans commit included, so it always sits at least one commit past `FANOUT_HEAD` (and past `BEFORE_SHA` on the normal path — on the unsynced reuse path `BEFORE_SHA` is the remote head and serves *only* the idempotency compare and the footer; every local-range use anchors on `FANOUT_HEAD`). "This run changed no code" is signaled by the plans record's `FIX_SHA == FANOUT_HEAD`, not by `after == before`; convergence to the cheap skip comes from Step 4's plans-only case, not from HEAD standing still. The `before` half is `BEFORE_SHA` from Step 4, still in scope — the next run's idempotency check parses it, and capturing `before` as "where we started, not where we ended" remains the load-bearing semantic.
 
 ## Step 13 — Promote to ready (if clean)
 
 Conditions for promoting `gh pr ready <N>` (ALL must hold):
 
 - PR was opened as draft.
-- `/review-fix-loop` converged (stop reason `convergence`, not `max-rounds` / `steady-state` / `regression`) — or Step 9 skipped the loop for an empty meaningful set, which counts as converged. On the Step 2 **Agent-less path** with meaningful fixes applied, this condition is unsatisfiable by design: **leave draft**, reason *"fixes applied without a convergence loop (Agent-less context)"* — its empty-set case still promotes via the skip-counts-as-converged mapping.
+- `/review-fix-loop` converged (stop reason `convergence`, not `max-rounds` / `steady-state` / `regression`) — or Step 9 skipped the loop for an empty meaningful set, which counts as converged.
 - No `USER_PENDING` escalations from the loop.
 - No non-fast-forward rebase in Step 12 — a rebase-retry produced a combined state no lens or test run examined; leave draft with that note.
 - No **risk-ambiguous** `Not fixed` items — Step 9's "don't know if it's a real issue / fix is risky / scope-expansion" bucket leaves the PR draft. **Deliberate, documented out-of-scope scope decisions do NOT block promotion**: a tight PR routinely records consult-grade non-fixes in the Step 14 comment, and those are fine to promote over — only the risk-ambiguous bucket gates `ready`.
@@ -404,8 +417,9 @@ Otherwise leave as draft.
 
 ## Step 14 — Post PR comment
 
-```bash
-gh pr comment <N> --body "$(cat <<EOF
+~~~bash
+BODY_FILE=$(mktemp)
+cat > "$BODY_FILE" <<'EOF'
 ## /pr-auto-review
 
 **Outcome**: <No issues found | Issues found and fixed | Issues found, some fixed and some left | Failed to push fixes (fork without maintainer-edit)>
@@ -423,31 +437,38 @@ gh pr comment <N> --body "$(cat <<EOF
 - <file:line> — <one-line summary> — **why not fixed**: <rationale>
 
 ### Meaningful decisions made (<count>) [omit if zero]
-- <decision> — <rationale> — consult outcome: <converged | resolved-divergence | single-source> (the `/review-fix-loop` vocab; Step 15 protocol decisions use its own tiebreaker labels)
+- <decision> — <rationale> — consult outcome: <converged | resolved-divergence | single-source> (review-fix-loop Lane 2's vocab; annotate the terminal rule when the extended chain decided)
 
 ### Tests
 <ran (passed) | ran (failed N times after fix attempts) | skipped (no test command detected)>
 
 ### PR status
 <promoted to ready-for-review | left as draft because: <reason>>
+EOF
 
-### Patches [only for fork-without-maintainer-edit cases]
+# [Fork-without-maintainer-edit case ONLY] append the Patches section.
+# Patch bytes pass through cat alone — never through any heredoc:
+cat >> "$BODY_FILE" <<'EOF'
+
+### Patches
 
 The agent could not push fixes to your fork. Apply with:
 
-\`\`\`
+```
 git apply <<'PATCH'
-<git format-patch output>
+EOF
+cat "$PATCH_FILE" >> "$BODY_FILE"
+cat >> "$BODY_FILE" <<'EOF'
 PATCH
-\`\`\`
+```
 
 (or paste the diff into a new commit yourself).
-
----
-*Generated by \`/pr-auto-review <N>\` via Claude Code @ before=$BEFORE_SHA after=$AFTER_SHA.*
 EOF
-)"
-```
+
+# Footer last — the ONLY expanding step, and it carries only the two SHAs:
+printf -- '\n---\n*Generated by `/pr-auto-review <N>` via Claude Code @ before=%s after=%s.*\n' "$BEFORE_SHA" "$AFTER_SHA" >> "$BODY_FILE"
+gh pr comment <N> --body-file "$BODY_FILE"
+~~~
 
 The `@ before=<sha> after=<sha>` footer is **load-bearing** — Step 4's idempotency check on the next run parses the `before=<sha>` value. Specifically:
 
@@ -456,7 +477,7 @@ The `@ before=<sha> after=<sha>` footer is **load-bearing** — Step 4's idempot
 - Don't omit either label. Don't put any other `before=<hex>` or `after=<hex>` token in the body that could confuse the parser. Don't reformat the footer without updating Step 4's regex.
 - The comment — footer included — is posted here, by the per-PR agent: the agent that pushed and still holds both SHAs in scope. Never bubble the footer up for the dispatcher to post; a dispatcher-assembled footer decouples the SHAs from the worktree that produced them.
 
-(The unquoted `EOF` here is load-bearing on two coupled counts: it lets `$BEFORE_SHA` / `$AFTER_SHA` expand, and it makes the backslash-escaped backticks render as literal Markdown backticks. **Do not convert this heredoc to a quoted `<<'EOF'`** — a quoted delimiter suppresses expansion (the footer would read a literal `before=$BEFORE_SHA`) *and* stops backslash processing (each escaped backtick keeps its leading backslash), corrupting the `before=`/`after=` footer that Step 4's idempotency parser matches on. The escaping is heredoc-quoting-dependent — it works only with the unquoted delimiter.)
+(The assembly split is load-bearing. The body heredocs use **quoted** `<<'EOF'` delimiters because the body carries PR-derived and reviewer-authored text — finding summaries, filenames, rationales, patch bytes — and an expanding heredoc would run `$(...)`/backtick substitution on that content at comment time (executing third-party text; even an innocent code-quoting backtick pair corrupts the body). With the quoted delimiter, backticks are typed plainly — no backslash-escaping. The footer is appended by `printf` as the only expanding step, interpolating nothing but the two run-controlled SHAs. **Do not fold the footer into a quoted heredoc** (it would post a literal `before=$BEFORE_SHA`, breaking Step 4's parser) **and do not switch any body heredoc to an unquoted delimiter.**)
 
 ## Step 15 — Tough-decision protocol (reference)
 
@@ -464,7 +485,7 @@ Anywhere the agent faces a judgment call it would have stopped to ask about (whi
 
 1. Frame the decision.
 2. Fan out an opinion leaf (`model: opus`/`fable` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel.
-3. Synthesize with the `review-fix-loop.md` Lane 2 tiebreakers (reversibility → behavior preservation → blast radius → confidence → least action → first option in framing). (The confidence / least-action / first-option extensions are a deliberate divergence from Lane 2's terminal rule, as in auto-merge-main Step 10: Lane 2 escalates true ties to the user via its report; this protocol runs unattended, so ties resolve to the leave-as-is / no-op option when one is present, else the first option in the framing — and get logged.)
+3. Synthesize with `review-fix-loop.md` Lane 2's **unattended variant** (the canonical statement of the extended chain: reversibility → behavior preservation → blast radius → higher confidence → least action → first option in the framing — logging which terminal rule fired).
 4. Log in `plans/<branch>.md` Decisions section; surface meaningful ones in the PR comment.
 5. Proceed.
 
