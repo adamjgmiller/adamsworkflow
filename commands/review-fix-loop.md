@@ -1,11 +1,11 @@
 ---
 description: Loop a review command (/quick-review, /dual-review, /lens-review), fix critical/high + safe low-risk findings each round, re-review until convergence, steady-state, regression, or max rounds (default 5).
-argument-hint: "<review-command> [its args] [up to N times] [don't commit]"
+argument-hint: "<review-command> [its args] [scope <ref|A...B>] [up to N times] [don't commit]"
 ---
 
 Loop a review command and fix findings until convergence or a hard stop.
 
-Usage: `/review-fix-loop <review-command> [<args for the review command>] [up to N times] [don't commit]`
+Usage: `/review-fix-loop <review-command> [<args for the review command>] [scope <ref|A...B>] [up to N times] [don't commit]`
 
 Examples:
 - `/review-fix-loop /quick-review`
@@ -26,7 +26,7 @@ State the parsed plan back in one line before starting (e.g., *"Looping `/lens-r
 
 ## Step 1 — Establish `LOOP_BASE` and loop state
 
-Record the current HEAD SHA as `LOOP_BASE` (`git rev-parse HEAD`) and the loop's working tree as `WORKTREE` (`git rev-parse --show-toplevel`) — every lane brief below anchors its sub-agent to `WORKTREE`, and **the loop's own git commands (this checkpoint, 2e's commits, Step 4's reset) all run from it too** (when this loop runs inline inside a worktree-resident stage-agent, the session-default cwd is a *different* checkout). **If HEAD is on the default branch, create a working branch first** — before the checkpoint below and regardless of which ladder rule sets `REVIEW_BASE` (the global CLAUDE.md's never-commit-to-main rule; `--no-commit` mode may stay put, since Step 4 resets everything). Then, if `git status --porcelain` is non-empty, commit the pre-loop state:
+Record the current HEAD SHA as `LOOP_BASE` (`git rev-parse HEAD`) and the loop's working tree as `WORKTREE` (`git rev-parse --show-toplevel`) — every lane brief below anchors its sub-agent to `WORKTREE`, and **the loop's own git commands (this checkpoint, 2e's commits, Step 4's reset) all run from it too** (when this loop runs inline inside a worktree-resident stage-agent, the session-default cwd is a *different* checkout). **If HEAD is on the default branch, create a working branch first** (name it `review-fix/<short LOOP_BASE SHA>` unless your dispatcher named one — Steps 4–5 report it) — before the checkpoint below, in every mode *including* `--no-commit`, and regardless of which ladder rule sets `REVIEW_BASE` (the global CLAUDE.md's never-commit-to-main rule: the checkpoint and per-round commits must never land on main even transiently — an interrupted run would strand them there; Step 4's reset then leaves you on the working branch with the changes staged). Then, if `git status --porcelain` is non-empty, commit the pre-loop state:
 
 ```bash
 git add -A && git commit -m "checkpoint: pre-/review-fix-loop state"
@@ -103,7 +103,7 @@ Spawn a sub-agent (`general-purpose`, `model: opus`/`fable` per the model-select
 
 If the review command is `/dual-review`, the dispatched review sub-agent runs both reviewers within itself — Claude inline plus Codex as a detached process gated on a sentinel file (works at any nesting depth; it spawns no children); it handles the mechanism internally, don't brief it on it. Expect the report labeled `concurrent single-process dual-source`; a `single-source` label means Codex was unavailable or its run failed/was unusable (the report carries the evidence) — note that degradation rather than retrying it. Pending forwarding is best-effort — orchestrator dedup in Step 2b catches any duplicates.
 
-If the review command is `/lens-review`, the dispatched review sub-agent fans out one Opus + one Codex reviewer **per lens** as its own foreground children, then dedups/validates and returns the standard finding format with per-lens Opus-vs-Codex divergences flagged. Because 2a dispatches it as a fresh `general-purpose` review agent (model per the model-selection policy) which carries the `Agent` tool, the fan-out runs; expect two status labels — codex: `dual-source` or `single-source` (Codex unavailable, lenses ran Opus-only); fan-out: `per-lens fan-out`. (Its `degraded-fanout` fallback can't occur under this dispatch — 2a always carries the `Agent` tool — so don't wait on it.) Per-lens divergences it flags are routed by the dual-source-divergence rule in 2b below. **If its report carries a high-severity `WORKTREE-LEAK:` Notes flag** (a read-only lens leaf leaked an edit it couldn't restore itself), restore the named paths — `git -C <WORKTREE> restore <paths>` — **immediately, before Lane 1 FIX edits the tree**, else 2e's `git add -A` would sweep the stray edit into the round commit.
+If the review command is `/lens-review`, the dispatched review sub-agent fans out one Opus + one Codex reviewer **per lens** as its own children, then dedups/validates and returns the standard finding format with per-lens Opus-vs-Codex divergences flagged. Because 2a dispatches it as a fresh `general-purpose` review agent (model per the model-selection policy) which carries the `Agent` tool, the fan-out runs; expect two status labels — codex: `dual-source` or `single-source` (Codex unavailable, lenses ran Opus-only); fan-out: `per-lens fan-out`. (Its `degraded-fanout` fallback can't occur under this dispatch — 2a always carries the `Agent` tool — so don't wait on it.) Per-lens divergences it flags are routed by the dual-source-divergence rule in 2b below. **If its report carries a high-severity `WORKTREE-LEAK:` Notes flag** (a read-only lens leaf leaked an edit it couldn't restore itself), restore the named paths — `git -C <WORKTREE> restore --staged --worktree -- <paths>` (plain `restore` pulls from the index, so a staged leak survives it; delete leaf-created untracked paths too) — **immediately, before Lane 1 FIX edits the tree**, else 2e's `git add -A` would sweep the stray edit into the round commit.
 
 ### 2b. Bucket findings (orchestrator decides, in its own context)
 
@@ -270,6 +270,8 @@ Then synthesize per item:
   - Otherwise → reclassify as `USER_PREFERENCE`, add to `USER_PENDING` with `kind: consult-escalated`, attach both rationales as briefing. Do not enter into `DECIDED_TECH`.
 - **Codex missed an item Claude covered** (Codex partial failure / truncation) → proceed `single-source` on Claude for those items only. Flag in report. (Claude inline produces one structured response per dispatch — it doesn't fail per-item the way Codex can, so the symmetric case doesn't arise.)
 
+**Unattended variant (canonical home — the autonomous commands cite this).** A tough-decision protocol running with **no user channel** (`pr-auto-review` Step 15, `auto-merge-main` Step 10, `ship-issues` Appendix H) extends the chain past "truly tied" instead of escalating: **reversibility → behavior preservation → blast radius → higher confidence → least action (prefer the leave-as-is / no-op option when one is present) → first option in the framing** — logging which terminal rule fired. The extension is a deliberate divergence from this lane's own terminal rule (Lane 2 escalates true ties to the user via its end-of-loop report); it lives here, next to the base chain, so the three carriers can cite one statement instead of drifting. Carriers logging a consult outcome use Lane 2's vocab — `converged | resolved-divergence | single-source` — annotated with the terminal rule when the extended chain decided (e.g. `resolved-divergence (least action)`); `tied` is not an outcome (the chain always resolves).
+
 #### Lane 3 — APPLY (serial, single sub-agent)
 
 `leave as-is` outcomes need no apply: enter them into `DECIDED_TECH` directly — they never pass through Lane 3 (and never count as "skipped"). If no remaining decisions require an edit (all `leave as-is` or escalated to user), skip this lane.
@@ -288,7 +290,7 @@ git add -A && git commit -m "fix(round <r>): <K> fixes + <M> decisions from <com
 
 `<command>` is the review-command string with the leading slash stripped (e.g., `dual-review`, not `/dual-review`) — cleaner in git history.
 
-One-liner format: `fix: <file:line> — <one-liner>` or `decision: <file:line> — <one-liner> (<rationale>)`. Subject line: drop `<K> fixes` when `K == 0` (decision-only round) and/or drop `+ <M> decisions` when `M == 0` (fix-only round). Skip the commit when the tree has no changes to commit (`git status --porcelain` empty — both counters 0, or every decision was `leave as-is`) — next round will detect steady state.
+One-liner format: `fix: <file:line> — <one-liner>` or `decision: <file:line> — <one-liner> (<rationale>)`. Subject line: drop `<K> fixes` when `K == 0` (decision-only round) and/or drop `+ <M> decisions` when `M == 0` (fix-only round). Skip the commit when the tree has no changes to commit (`git status --porcelain` empty — both counters 0, or every decision was `leave as-is`) — the next round's 2c checks register the stop (convergence or steady-state per their own rules; don't pre-assign the label here — Step 3's stop reason feeds callers' promotion gates).
 
 ### 2f. Continue or stop
 
@@ -302,7 +304,7 @@ One of: `convergence` | `steady-state` | `regression` | `max-rounds`.
 
 ## Step 4 — Finalize git state
 
-**Auto-commit mode**: leave commits in place. Tell user how many were added on top of `LOOP_BASE`.
+**Auto-commit mode**: leave commits in place. Tell user how many were added on top of `LOOP_BASE` — and, when Step 1 created a working branch, name it: *"on `<working-branch>`; your original `<default>` is untouched."*
 
 **`--no-commit` mode**: soft-reset to `LOOP_BASE`:
 
@@ -310,7 +312,7 @@ One of: `convergence` | `steady-state` | `regression` | `max-rounds`.
 git reset --soft <LOOP_BASE_SHA>
 ```
 
-This collapses the per-round commits and pre-loop checkpoint back into staged uncommitted changes. Tell the user: *"Per `--no-commit`: squashed N loop commits back to uncommitted changes (staged) on top of `<LOOP_BASE_SHA>`. Run `git reset` if you want them unstaged instead. Note: if you had pre-existing staged vs unstaged changes when the loop started, that distinction is collapsed — everything returns as staged."*
+This collapses the per-round commits and pre-loop checkpoint back into staged uncommitted changes. Tell the user: *"Per `--no-commit`: squashed N loop commits back to uncommitted changes (staged) on top of `<LOOP_BASE_SHA>`. Run `git reset` if you want them unstaged instead. Note: if you had pre-existing staged vs unstaged changes when the loop started, that distinction is collapsed — everything returns as staged."* When Step 1 created a working branch, append: *"— you are on `<working-branch>`; `<default>` is untouched."*
 
 The staging-distinction loss is intentional simplicity: stashing staged-only state separately to preserve the distinction adds machinery for an edge case where the user can just re-stage as they want.
 
@@ -325,7 +327,7 @@ Present:
 
 **Rounds run**: <N> of <max>
 **Stop reason**: <reason> — <one-line elaboration>
-**Final git state**: <"<K> commits on top of <LOOP_BASE_SHA>" | "uncommitted changes on top of <LOOP_BASE_SHA>">
+**Final git state**: <"<K> commits on top of <LOOP_BASE_SHA>" | "uncommitted changes on top of <LOOP_BASE_SHA>"><", on working branch <name>" when Step 1 created one>
 
 ## Per-round summary
 
@@ -392,7 +394,7 @@ For each unfixed finding that is neither in `USER_PENDING` nor `DECIDED_TECH` (i
 - **Review command not recognized**: bail at step 0.
 - **Max rounds > 10**: bail at step 0.
 - **2a review agent lost** (killed, or its completion notification never arrived): Read `RUN_DIR/round-<r>-report.md` — the agent writes it before returning. File present → proceed to 2b on it. Absent → re-dispatch the round's review once and collect its notification (field-notes §4).
-- **Pre-loop checkpoint commit fails** (e.g., only gitignored changes): bail with the git error.
+- **Pre-loop checkpoint commit fails** (hook rejection, committer identity unset): bail with the git error. (Ignored-only changes never reach it — porcelain lists nothing, the checkpoint is skipped, and the loop proceeds on the clean-tree scope path; gitignored work is out of scope by design.)
 - **All fix sub-agents skip everything in a round**: DEFER everything; next round detects steady state.
 - **Parallel sub-agents conflict on shared file** (shouldn't happen with proper grouping): revert that round's partial work, fall back to sequential within the round.
 - **Codex unavailable for the entire run** (`command -v codex` fails): every consult that round runs `single-source` on Claude; flag once in the report. Do not bail the loop.
