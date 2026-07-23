@@ -5,6 +5,11 @@
 # This is a REPO TOOL, not user config: install.sh deliberately does NOT
 # install it into ~/.claude. Run it before publishing and in CI.
 #
+# MAINTENANCE NOTE: this gate is part of the tracked tree it scans, so it must
+# always pass its OWN scan. When adding or documenting a detection pattern here,
+# DESCRIBE the shape in prose and write any literal with [] character classes (as
+# the patterns below do) — never paste a real private literal you mean to catch.
+#
 # Usage:
 #   ./scripts/check-leakage.sh              # tracked tree + branch messages + history
 #   ./scripts/check-leakage.sh --staged     # ALSO scan staged (index) content

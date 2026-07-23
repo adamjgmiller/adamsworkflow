@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # install.sh — mirror this repo's Claude Code config into ~/.claude/
 #
-# Installs: commands/ skills/ agents/ workflows/ scripts/ and docs/field-notes.md
-# (the harness field notes the commands cite at ~/.claude/docs/field-notes.md).
+# Installs: commands/ skills/ agents/ workflows/ scripts/ and two docs/ files —
+# docs/field-notes.md (the harness field notes the commands cite at
+# ~/.claude/docs/field-notes.md) and docs/ship-issues-pathB.md (the ship-issues
+# Workflow-fabric recipe, cited at ~/.claude/docs/ship-issues-pathB.md).
 # Skipped on purpose: README.md, CLAUDE.md, CLAUDE-global.md, docs/devbox.md,
-# docs/design-sample.html (reference docs you merge into your own config by
-# choice), and scripts/check-leakage.sh (a repo-maintenance tool, not config).
-# Of docs/, only field-notes.md is installed — everything else under docs/
-# (index.html and .nojekyll, the GitHub Pages site) is not installed.
+# docs/config-change-reference.md, docs/design-sample.html (reference docs you
+# merge into your own config by choice), and scripts/check-leakage.sh (a
+# repo-maintenance tool, not config).
+# Of docs/, only field-notes.md and ship-issues-pathB.md are installed —
+# everything else under docs/ (index.html and .nojekyll, the GitHub Pages site;
+# config-change-reference.md; devbox.md; design-sample.html) is not installed.
 #
 # Usage:
 #   ./install.sh --symlink     # symlink each file (git pull updates live config)
@@ -35,7 +39,7 @@ TARGET_DIR="${CLAUDE_HOME:-$HOME/.claude}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 usage() {
-  sed -n '2,24p' "$0"
+  sed -n '2,28p' "$0"
   exit "${1:-0}"
 }
 
@@ -237,6 +241,13 @@ if [[ -f "$REPO_DIR/docs/field-notes.md" ]]; then
   install_one docs/field-notes.md
 else
   say "  warn  docs/field-notes.md not found — skipped (commands cite it at ~/.claude/docs/)"
+fi
+
+# The ship-issues Workflow-fabric recipe, cited by commands/ship-issues.md by path.
+if [[ -f "$REPO_DIR/docs/ship-issues-pathB.md" ]]; then
+  install_one docs/ship-issues-pathB.md
+else
+  say "  warn  docs/ship-issues-pathB.md not found — skipped (ship-issues cites it at ~/.claude/docs/)"
 fi
 
 migrate_v1

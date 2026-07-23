@@ -28,13 +28,17 @@ below rather than stopping to ask.
   and report it — don't run the experiment). Only an explicit *implementation* leaf edits
   files, and never run two tree-mutating leaves against the same worktree concurrently —
   you, the stage-runner, own commits (your leaves never commit).
-- **Collect every leaf child's completion before advancing** — dispatches are async-only
-  (no foreground mode); each leaf's result arrives as a task-notification carrying its
-  final text, attached to your next tool result or re-waking you if you've ended your
-  turn. Count your dispatches and reconcile arrivals against that count
-  (field-notes §4).
-- **Reconcile your children's reports against `git diff` — the diff is truth.** If a
-  reported change isn't in the diff, re-dispatch; don't advance on a report alone.
+- **Collect every leaf child's completion before advancing.** Running unnamed, dispatches
+  are async-only (no foreground mode); each leaf's result arrives as a task-notification
+  carrying its final text, attached to your next tool result or re-waking you if you've
+  ended your turn — count your dispatches and reconcile arrivals against that count.
+  Running named, each dispatch blocks and returns the result inline — assume serial, keep
+  your own fan-outs small (field-notes §4).
+- **Reconcile your children's reports against the tree — the tree is truth.** Before
+  committing: `git diff HEAD` plus `git status --porcelain --untracked-files=all`
+  (plain `git diff` misses staged edits and new files); after committing: the
+  stage-base..HEAD range. If a reported change isn't there, re-dispatch; don't
+  advance on a report alone.
 - **Run your loop to completion** within the budget. If the budget exhausts with issues
   open, stop and return them as findings — don't loop forever and don't silently drop them.
 - **Hold your final verify's result before returning — never ship a bundle on a

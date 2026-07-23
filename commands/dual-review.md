@@ -32,13 +32,9 @@ Execute in this order:
 
 4. **Collect Codex (Reviewer B)**: poll the sentinel per gotcha-3 step 2 — a separate Bash call with `timeout: 600000` running `until [ -f /tmp/codex-done-$JOB_ID.flag ]; do sleep 10; done`. Often the sentinel is already present and there is no real wait. Gotcha 4 applies: if the wait call returns auto-backgrounded, do a fast sentinel check **in the same response** and re-issue the poll if it isn't there yet — the flag file is the source of truth; never end the turn "waiting to be notified."
 
-5. **Extract, don't ingest**: once the sentinel exists, read the `exit=N` line from the flag file, then pull only the findings block from the log instead of cat-ing the whole file:
+5. **Extract, don't ingest**: once the sentinel exists, read the `exit=N` line from the flag file, then pull only the answer block from the log via codex-consult's canonical marker extraction (its step-5 awk: last `^codex$` marker → `^tokens used$`) — everything after the token count is a verbatim duplicate echo of the same answer, which a findings-anchored `sed …,$p` would capture twice and feed into Step 3's dedup as noise.
 
-   ```bash
-   sed -n '/^[[:space:]]*1\. \[SEVERITY/,$p' /tmp/codex-out-$JOB_ID.log
-   ```
-
-   If extraction comes back empty, **log why before falling back** — a blank result is a *symptom* (format drift in the `1. [SEVERITY` anchor, or Codex returning error text instead of findings), not a bug in the `sed`. Record `exit=N`, whether the anchor matched (`grep -qE '^[[:space:]]*1\. \[SEVERITY' /tmp/codex-out-$JOB_ID.log && echo y || echo n`), and the extracted byte count, so a downstream reader pins the real cause instead of guessing. Then fall back to reading the log file directly and say so in the report. If `exit=N` is non-zero or the log is clearly truncated, surface the `JOB_ID` and exit line as evidence and proceed with the Codex side marked failed — do not invent findings, and do not paper over the failure.
+   If extraction comes back empty, **log why before falling back** — a blank result is a *symptom* (non-zero exit, a Codex error page, or marker drift), not a bug in the awk. codex-consult's step-5 fallback snippet prints exactly the needed evidence (`exit=N`, `codex_marker=`/`tokens_marker=`, byte count) — use it, so a downstream reader pins the real cause instead of guessing. Then fall back to reading the log file directly and say so in the report. If `exit=N` is non-zero or the log is clearly truncated, surface the `JOB_ID` and exit line as evidence and proceed with the Codex side marked failed — do not invent findings, and do not paper over the failure.
 
 6. **Clean up this job's files** by substituting the literal `JOB_ID` (gotcha-3 cleanup step) — never a wildcard.
 
@@ -48,7 +44,7 @@ If Codex completed with usable output, label the report **`concurrent single-pro
 
 > Scope (do not redetect): `<SCOPE>`
 >
-> For `uncommitted` scope: read `git diff HEAD` plus untracked files from `git status --porcelain` — the same ground truth step 3.2 validates against (plain `git diff` would review a narrower diff than the Codex side sees).
+> For `uncommitted` scope: read `git diff HEAD` plus untracked files from `git status --porcelain --untracked-files=all` (the default listing collapses a wholly-untracked directory to one `dir/` entry, hiding its files) — the same ground truth step 3.2 validates against (plain `git diff` would review a narrower diff than the Codex side sees).
 >
 > [If a dispatching loop handed you Pending/Decided lists: honor them per its instructions — don't re-litigate those items. The same lists go verbatim into the Codex prompt body in step 2.2.]
 
@@ -58,7 +54,7 @@ Don't skip — this is the point of running two sources.
 
 1. **Verify both reviewers actually ran.** The report must carry the `JOB_ID` and the sentinel `exit=N` line from your own step-2 launch — proof Codex executed rather than being skipped. If Codex was unavailable at preflight or errored mid-run, label the report `single-source` with the evidence. Never silently present Claude-only findings as if dual-review succeeded.
 
-2. **Read the actual diff for `<SCOPE>`** — `git diff HEAD` for uncommitted (staged + unstaged — plain `git diff` misses staged work the Codex prompt *does* review), plus untracked files via `git status --porcelain` (read them directly); the **literal** scope string for a branch range (`git diff <A>...<B>` — the same string every reviewer got, not a rewritten `...HEAD`); `git show <SHA>` for a commit. Validation must be grounded in real diff content, not in the reviewers' summaries — a ground truth narrower than what the reviewers saw drops real findings as hallucinated.
+2. **Read the actual diff for `<SCOPE>`** — `git diff HEAD` for uncommitted (staged + unstaged — plain `git diff` misses staged work the Codex prompt *does* review), plus untracked files via `git status --porcelain --untracked-files=all` (read them directly); the **literal** scope string for a branch range (`git diff <A>...<B>` — the same string every reviewer got, not a rewritten `...HEAD`); `git show --first-parent <SHA>` for a commit (a merge commit's default combined diff shows nothing for cleanly-merged content). Validation must be grounded in real diff content, not in the reviewers' summaries — a ground truth narrower than what the reviewers saw drops real findings as hallucinated.
 
 3. **Dedup by `(file, ~line, topic)`.** Findings on the same line about the same issue → merge into one with attribution `(flagged by both)`. Single-source findings → keep with `(Claude only)` or `(Codex only)`. Don't drop a finding just because one reviewer missed it.
 

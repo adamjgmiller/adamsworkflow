@@ -5,14 +5,14 @@ How I run Claude Code. The loops, the config, and the devbox. A guide and my ski
 ## What this is
 
 A guide, plus the real files it describes: the actual 14 commands, 4 skills,
-4 agent defs, 4 script packages, and 1 workflow I run at `~/.claude/`,
+4 agent defs, 4 script packages, and 2 workflows I run at `~/.claude/`,
 generalized so someone else can adopt them. Prefer the one-page visual map?
 [adamjgmiller.github.io/adamsworkflow](https://adamjgmiller.github.io/adamsworkflow/). The map of what each piece
 requires and how it degrades is in [CLAUDE.md](./CLAUDE.md); my global
 config, generalized, is [CLAUDE-global.md](./CLAUDE-global.md).
 
 To be clear about what you are getting: this is a dated snapshot of a living
-config (generalized 2026-07-18), not a framework — no version scheme, no
+config (generalized 2026-07-18, re-synced 2026-07-20), not a framework — no version scheme, no
 roadmap. It is what I actually run, cleaned up for machines that are not
 mine. This file itself was drafted and adversarially reviewed by the loops
 it describes; the final read, as always, is human.
@@ -181,6 +181,15 @@ agent reviews its own edits. The audit used the machinery it was fixing:
 eight Codex rounds converged 17 → 9 → 8 → 4 → 4 → 4 → 3 → 0 findings, with
 a fresh adversarial review as the final gate.
 
+In the origin config this discipline is now its own skill — the procedure
+that lands a config change without letting the config go stale: move the
+fact to its one canonical home, sweep every carrier that repeats it, sync
+the router, log why. Its runnable form stays upstream, but a faithful
+reference version ships here at
+[docs/config-change-reference.md](./docs/config-change-reference.md): the
+worked procedure written out, so you port the rule instead of copying a
+snapshot. Shown, not just told.
+
 The takeaway: port the rule, not just the files. A snapshot of this config
 goes stale the week you clone it. The loop is what keeps a fork alive.
 
@@ -343,14 +352,18 @@ updates, that is the feature. If you would rather not extend that trust,
 use `--copy`, or pin the clone to a commit you have read.
 
 **What it installs:** `commands/`, `skills/`, `agents/`, `workflows/`, and
-`scripts/`, plus [docs/field-notes.md](./docs/field-notes.md) — the
-commands cite it at `~/.claude/docs/field-notes.md`.
+`scripts/`, plus two files from `docs/` — [field-notes.md](./docs/field-notes.md)
+(cited at `~/.claude/docs/field-notes.md`) and
+[ship-issues-pathB.md](./docs/ship-issues-pathB.md) (the ship-issues
+Workflow-fabric recipe, cited by `commands/ship-issues.md` at the same
+`~/.claude/docs/` path).
 
 **Deliberately not installed:** `README.md`, [CLAUDE.md](./CLAUDE.md),
 [CLAUDE-global.md](./CLAUDE-global.md), [docs/devbox.md](./docs/devbox.md),
-and the design-sample page (a style reference for generated pages) —
-reference documents you merge by choice — and
-[scripts/check-leakage.sh](./scripts/check-leakage.sh), which is a
+[docs/config-change-reference.md](./docs/config-change-reference.md) (a
+reference-only worked procedure), and the design-sample page (a style
+reference for generated pages) — reference documents you merge by choice —
+and [scripts/check-leakage.sh](./scripts/check-leakage.sh), which is a
 repo-maintenance gate, not config.
 
 **Migrating from v1:** if you installed the earlier version of this repo,
@@ -394,7 +407,10 @@ verified one.
   their place and ships a prompt for building your own instead — the same
   move as the adaptation prompt above: tell your own Claude what you want.
 - **My personal infrastructure.** Bot configs, sync tooling, private
-  services. Nothing shipped here depends on them.
+  services. No installed artifact depends on them; only the reference
+  documents (CLAUDE-global.md, docs/config-change-reference.md, the devbox
+  chapter) so much as describe that infrastructure, and reading a
+  description is not a dependency.
 - **A live update feed.** This repo gets occasional re-syncs from the live
   config. The improvement loop itself lives upstream — which is exactly
   why the improvement-loop section above says to port the rule, not just

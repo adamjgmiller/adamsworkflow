@@ -3,7 +3,7 @@ description: Autonomously merge main into a PR's branch, resolve conflicts prese
 argument-hint: "[<pr-num> ...]"
 ---
 
-Autonomously bring one or more PRs up to date with main: analyze for textual + semantic conflicts, merge main, resolve conflicts preserving both the PR's intent and main's new behavior, review the merge work, run tests, push, and comment. No stopping for human input — judgment calls land in the decision log and the PR comment. Only bails when git conflicts are genuinely unresolvable or tests can't be made to pass. Idempotent: skips quickly when the branch already contains current main.
+Autonomously bring one or more PRs up to date with main: analyze for textual + semantic conflicts, merge main, resolve conflicts preserving both the PR's intent and main's new behavior, review the merge work, run tests, push, and comment. No stopping for human input — judgment calls land in the decision log and the PR comment. Bails only per the Hard-rules bail list (unresolvable conflicts and unfixable tests being the common cases). Idempotent: skips quickly when the branch already contains current main.
 
 Usage: `/auto-merge-main [<pr-num> [<pr-num>...]]`
 
@@ -25,7 +25,14 @@ Hard blockers:
 ```bash
 git rev-parse --git-dir >/dev/null
 gh repo view --json nameWithOwner,defaultBranchRef >/dev/null
-for N in <prs>; do gh pr view "$N" --json number,title,state,isDraft,headRefName,baseRefName,mergeable,mergeStateStatus,url >/dev/null; done
+# gh pr view exits 0 for MERGED/CLOSED PRs too (probe-verified, gh 2.93) — the
+# state test, not the exit code, is the open-PR gate; the exit code only
+# catches missing/inaccessible PRs. Merging main into a dead PR's branch would
+# push to a branch nobody will merge and comment on a closed PR.
+for N in <prs>; do
+  STATE=$(gh pr view "$N" --json state --jq .state) || exit 1
+  [ "$STATE" = "OPEN" ] || { echo "PR #$N state=$STATE — not open"; exit 1; }
+done
 ```
 
 Capture the repo's default branch from `defaultBranchRef.name` — usually `main`, sometimes `master`. Use that as `BASE_BRANCH` throughout (rest of this doc says `main`, substitute).
@@ -41,7 +48,7 @@ Always delegate, the single-PR case included — the merge/review/test volume fo
 - **For each PR (1..N)** → spawn one `general-purpose` stage-agent — dispatch with an explicit `model:`: default `opus` (conductor); escalate a given PR's agent to `fable` only when it passes the policy's escalation test (per-PR call); never leave it to inheritance (an unpinned dispatch inherits the session model): *"Follow `~/.claude/commands/auto-merge-main.md` Steps 3–14 for PR #N (BASE_BRANCH=`<value>`). Every child you spawn (the 7b resolver, Step 10 consult leaves, the review loop's sub-agents) dispatches async — its result arrives as a task-notification that re-wakes you if you've stopped; collect every child's notification before advancing (field-notes §4). You own the irreversible tail — the merge-main-into-branch commit, the push to the PR's own head ref, the PR comment — execute those yourself; never sub-delegate them to your own children. If you hit **any** bail condition in the Hard rules list (that list is authoritative — every condition in it, not a subset), execute its bail exactly as written (abort/comment) and report it in your per-item block; never improvise past a bail, never swallow one. Return the per-item report block (Step 13)."*
 - **Cap: at most 4 per-PR stage-agents in flight**; start the next as one returns. (If 4 proves tight in practice, drop to 3.) The cap is not optional: each stage-agent fans out children of its own (the review loop's 2a review sub-agent, Step 10 consult children, the Step 7b resolver), so the real concurrent-agent number is PRs-in-flight × within-PR children (`~/.claude/docs/field-notes.md` §6). Stay under it.
 - Collect all blocks. For each `merged + pushed` block, spot-verify the report against the remote: `gh pr view <N> --json headRefOid` should start with the block's branch SHA — the block describes intent, the ref is truth. On a prefix mismatch, don't fail the block outright — `git fetch origin <pr-branch>` and check `git merge-base --is-ancestor <reported-sha> <headRefOid>`: if the reported SHA is an ancestor of the current head, the merge landed and someone pushed after it (accept; note the trailing push); only a SHA unreachable from the head means the merge didn't land.
-- No `Agent` tool in your own toolset (e.g. this file reached via a Workflow agent's Skill tool)? Then you can't spawn — run Steps 3–14 inline yourself, one PR at a time — executing the delegated pieces in your own context: resolve 7b's conflicts yourself, serially, applying the resolver brief's rules; replace Step 8's loop with one inline `/dual-review` pass (its single path needs no `Agent` tool; expect the `concurrent single-process dual-source` label), **apply its critical/high findings yourself with minimal targeted edits and commit them per the repo's convention**, then treat any critical finding you could not fix as a Step 8 bail — a single pass yields no regression signal, so this criterion deliberately replaces Step 8's regression bail on this path; fix tests yourself (Step 9); run Step 10's Codex side via codex-consult inline. Capability is detected, never assumed.
+- No `Agent` tool in your own toolset (e.g. this file reached via a Workflow agent's Skill tool)? **Bail before any side effect** with a clear error: this command requires the Task fabric — re-run it from the main loop or a spawn-capable stage-agent. There is no degraded inline mode (capability is detected, never assumed; the resolver, review loop, and consult machinery all presume spawning).
 
 ## Step 3 — Worktree setup
 
@@ -56,7 +63,7 @@ For an existing worktree with uncommitted changes specifically for `/auto-merge-
 *Generated by `/auto-merge-main <N>` via Claude Code @ branch=<short-sha> main=<short-sha>.*
 ```
 
-This is the rare exception to the "never bail" rule — pushing a half-merged tree on top of someone's local work is worse than asking them to clean up first.
+This is one of the Hard-rules bail conditions — pushing a half-merged tree on top of someone's local work is worse than asking them to clean up first.
 
 ## Step 4 — Update local refs
 
@@ -65,7 +72,9 @@ git fetch origin "$BASE_BRANCH"
 git fetch origin <pr-branch>                                # ensure local branch matches remote
 ```
 
-If local branch is behind remote, fast-forward (`git pull --ff-only`). If diverged, that's a separate problem — bail with a comment on the PR (with the standard footer).
+**Fork PR** (Step 1's `headRepositoryOwner` ≠ the repo owner): the head branch lives on the fork, not `origin`, so the second fetch fails — fetch from the per-PR fork remote the Step 3 snippet defines (`FORK_REMOTE=pr-<N>-fork`, URL derived there): `git fetch "$FORK_REMOTE" <pr-branch>`; if the reused worktree predates that remote, create it per pr-auto-review Step 3's fork branch. Step 11's push names the same `$FORK_REMOTE` explicitly (its failure handling covers the no-maintainer-edit case).
+
+If local branch is behind remote, fast-forward **from the ref you just fetched**: `git merge --ff-only "origin/<pr-branch>"` (`"$FORK_REMOTE/<pr-branch>"` for fork PRs). Not bare `git pull --ff-only` — it follows the branch's *configured upstream*, which in a scaffolded worktree is typically unset (errors) or can name a different remote than the PR head. If diverged, that's a separate problem — bail with a comment on the PR (with the standard footer).
 
 ## Step 5 — Idempotency check (skip if branch already contains current main)
 
@@ -94,11 +103,14 @@ For the bail case, look up the most recent prior `/auto-merge-main` comment (bes
 ```bash
 LAST_RUN_DATE=$(gh api "repos/:owner/:repo/issues/<N>/comments" --paginate \
   --jq '[.[] | select(.body | test("Generated by `/auto-merge-main .*` via Claude Code @"))]
-        | sort_by(.created_at) | last | .created_at' \
-  | head -1)
+        | sort_by(.created_at) | last | .created_at // empty' \
+  | tail -1)   # tail, not head: --paginate runs the --jq filter per page (oldest page
+               # first) — the last line is the newest match. The `// empty` keeps
+               # matchless pages silent: without it a newer page with no match emits
+               # a literal `null` line that tail would pick over an earlier real date
 
 if [ -n "$LAST_RUN_DATE" ] && [ "$LAST_RUN_DATE" != "null" ]; then
-  BAIL_HEADER="no new commits on \`$BASE_BRANCH\` since the last /auto-merge-main run on $LAST_RUN_DATE"
+  BAIL_HEADER="branch already contains current \`$BASE_BRANCH\` (last /auto-merge-main run: $LAST_RUN_DATE)"
 else
   BAIL_HEADER="branch is already up-to-date with \`$BASE_BRANCH\`"
 fi
@@ -111,7 +123,7 @@ gh pr comment <N> --body "$(cat <<EOF
 
 **Skipped**: $BAIL_HEADER. Nothing to merge.
 
-If you want to force a re-run (e.g., to re-verify after an upstream change you suspect should have flowed through), push a \`--allow-empty\` commit to \`$BASE_BRANCH\` or to this branch, then re-invoke.
+If you want to force a re-run (e.g., to re-verify after an upstream change you suspect should have flowed through), push a \`--allow-empty\` commit to \`$BASE_BRANCH\`, then re-invoke (an empty commit on this branch leaves the ancestry check unchanged and skips again).
 
 ---
 *Generated by \`/auto-merge-main <N>\` via Claude Code @ branch=$COMMENT_BRANCH_SHORT main=$COMMENT_MAIN_SHORT.*
@@ -128,7 +140,7 @@ Return the skip per-item block (Step 13 covers the format).
 - A previous run posting comments doesn't change git state. The agent should re-run if main has moved, regardless of whether a prior comment exists.
 - Force-pushes that drop the previous merge commit (e.g., author rebased) leave `is-ancestor` returning false — the agent correctly re-merges.
 - A user manually merging main into the branch and then running `/auto-merge-main` correctly bails (no work needed).
-- Failed prior runs don't change git state (the merge was aborted), so `is-ancestor` still returns false → re-run, which is what we want (user may have fixed the upstream issue).
+- Failed prior runs don't change lasting git state (7c aborts the merge and restores `plans/`; the Step 8/9/11 bails reset to `PRE_MERGE_HEAD`), so `is-ancestor` still returns false → re-run, which is what we want (user may have fixed the upstream issue).
 
 ## Step 6 — Conflict analysis (pre-merge)
 
@@ -137,7 +149,9 @@ Surface predictable conflicts *before* attempting the merge, so the agent can pr
 ```bash
 git log --oneline <merge-base>..origin/main                 # what's coming in
 git log --oneline <merge-base>..HEAD                        # what the PR has
-git diff <merge-base> origin/main -- $(git diff --name-only <merge-base>..HEAD)
+git diff --name-only <merge-base>..HEAD | while IFS= read -r f; do
+  git diff <merge-base> origin/main -- "$f"   # per-file: space-safe, empty-safe
+done
 ```
 
 Read main's commits ahead. Read the PR's commits. Look for:
@@ -152,6 +166,7 @@ Record the analysis in the umbrella's Decisions section (or initialize the umbre
 ## Step 7 — Merge main
 
 ```bash
+PRE_MERGE_HEAD=$(git rev-parse HEAD)      # Step 8's review-scope anchor — capture BEFORE merging
 git merge origin/main --no-edit
 ```
 
@@ -184,7 +199,7 @@ Proceed to Step 8.
 >
 > **Return**: per-file one-line resolution summaries, consult outcomes for any fresh decisions, and any unresolvable verdict.
 
-On return, reconcile the resolver's report against the index — `git diff --staged` is truth; a reported resolution that isn't staged means re-dispatch, not commit. No conflict markers left and every conflicted file accounted for, then:
+On return, reconcile the resolver's report against the index — unresolved state is `git ls-files -u` (empty = every conflict staged as resolved; a listed path means re-dispatch, not commit). Inspect the actual resolutions with `git diff --staged`, knowing a file deliberately resolved to HEAD's version stages an entry identical to HEAD and shows **no** diff line there — absence from the cached diff is not absence of a resolution. No conflict markers left and `ls-files -u` empty, then:
 
 ```bash
 git commit --no-edit                                        # uses the default merge commit message
@@ -198,27 +213,35 @@ If the resolver returns a conflict as structurally impossible to resolve safely 
 
 ```bash
 git merge --abort
+git restore -- plans/ 2>/dev/null; git clean -fd -- plans/
 ```
+
+The plans restore is load-bearing: Step 6's analysis append is still uncommitted here
+(`merge --abort` preserves dirt on merge-untouched paths), and leftover dirt makes the
+next run's Step 3 bail blaming the user — breaking the re-run this bail exists to
+enable. Step 3 bailed on any pre-existing dirt, so everything under `plans/` at this
+point is this run's own; the analysis regenerates on a re-run (Step 6), and this
+bail's PR comment carries the verdict.
 
 Post a PR comment (Step 14) with `Outcome: failed — unresolvable conflict in <file>: <reason>`. This is one of the bail conditions in the Hard rules list (which is authoritative on the full set). The abort and the comment are yours, the stage-agent's — the resolver only packages the verdict.
 
 ## Step 8 — Review the merge work
 
-Single invocation of `/review-fix-loop /dual-review`. The diff scope is the merge commit + any conflict-resolution edits — `/review-fix-loop`'s internal scope detection handles it (branch ahead of base).
+Single invocation of `/review-fix-loop /dual-review scope <PRE_MERGE_HEAD>` (the SHA captured in Step 7). The explicit scope pins the review to the merge commit + any conflict-resolution edits. Never omit it: post-merge, HEAD contains main, so the loop's clean-tree fallback would anchor at `merge-base HEAD main` = main's tip — ballooning the "merge review" to the whole PR diff and auto-fixing unrelated pre-existing PR code (the same trap pr-auto-review Step 9 guards with its explicit `scope <PR_BASE_SHA>`).
 
 Run the loop **inline** in this stage-agent — invoking the slash command inline costs no nesting level; dispatching it as a child adds one for nothing. The loop's 2a review sub-agent is `general-purpose`; the dual-review it runs executes both reviewers within itself — Claude inline (this loop's review sub-agent authored nothing, so quick-review's fresh-eyes rule lands inline) plus Codex as a detached process gated on a sentinel file (no codex-runner child; works at any depth). Expect the `concurrent single-process dual-source` label. What nesting buys here: the review churn isolated from this agent's per-PR context — **not** a parallel Claude sibling. Chain: dispatcher(0) → this stage-agent(1) → the loop's review sub-agent(2) — comfortably inside the convention; add nothing below it.
 
 Capture: rounds, fixes applied, decisions made, escalations.
 
-If the loop hits regression (its 'newly introduced' counter exceeds last round's 'fixed') → that's signal the merge resolution introduced bugs. Don't push. Bail with a comment.
+If the loop hits regression (its 2c stop: 'newly introduced' exceeding last round's fixed + decided) → that's signal the merge resolution introduced bugs. Don't push. Restore the worktree first — `git reset --hard "$PRE_MERGE_HEAD"` (this run's own unpushed merge/fix commits only; the Hard-rules carve-out) — so the local branch's tracked state matches the remote PR again, then bail with a comment.
 
 ## Step 9 — Detect + run tests (loop fix up to 5 attempts)
 
 Detect the project's test command (`package.json` → `npm test`/`pnpm test`/`yarn test` per lockfile; `pyproject.toml` with pytest config → `pytest`; `Cargo.toml` → `cargo test`; `go.mod` → `go test ./...`; `Makefile` with `test:` target → `make test`; respect `.tool-versions`/`mise.toml` hints). If no test command is detectable → skip, note that no tests ran. Run the suite foreground when it fits the ~10-min Bash ceiling; background a longer run and await its completion notification — it re-wakes you with the output (field-notes §4); never proceed with the run pending.
 
-If tests fail post-merge, fix-loop up to 5 attempts (sub-agent brief: "All commands run from `<worktree>` — `cd <worktree>` at the start of every Bash call; your cwd does not persist between calls. Fix these failing tests, minimal edits, do not weaken the assertions; never return with a test run still pending — hold each run's result before acting (field-notes §4)"). After 5: **bail** with comment `Outcome: failed — tests broken after merge, 5 fix attempts didn't recover. <test-output-summary>`. Don't push test-broken state.
+If tests fail post-merge, fix-loop up to 5 attempts (sub-agent brief: "All commands run from `<worktree>` — `cd <worktree>` at the start of every Bash call; your cwd does not persist between calls. Fix these failing tests, minimal edits, do not weaken the assertions; never return with a test run still pending — hold each run's result before acting (field-notes §4)"). After 5: **bail** — restore the worktree first (`git reset --hard "$PRE_MERGE_HEAD"` — discards this run's own unpushed merge + test-fix commits; the Hard-rules carve-out — then `git clean -fd`: untracked leftovers from a failed attempt survive a hard reset, and Step 3 guaranteed a clean tree at run start, so anything untracked now is this run's own), then comment `Outcome: failed — tests broken after merge, 5 fix attempts didn't recover. <test-output-summary>`. Don't push test-broken state.
 
-(`/auto-merge-main`'s contract is "bring the branch up to date *cleanly*" — pushing broken tests undermines that. The PR remains in its pre-merge state; user investigates and re-runs.)
+(`/auto-merge-main`'s contract is "bring the branch up to date *cleanly*" — pushing broken tests undermines that. The PR remains in its pre-merge state — and the reset restores the local worktree's tracked state to match, keeping Step 5 honest on a re-run; user investigates and re-runs.)
 
 ## Step 10 — Tough-decision protocol (reference)
 
@@ -226,11 +249,11 @@ Anywhere the agent faces a judgment call it would have stopped to ask about:
 
 1. Frame the decision.
 2. Fan out an opinion leaf (`model: opus`/`fable` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel — collect both leaves' completion task-notifications before synthesizing (async dispatch; field-notes §4).
-3. Synthesize with the `review-fix-loop.md` Lane 2 tiebreakers (reversibility → behavior preservation → blast radius → confidence → least action → first option in framing).
+3. Synthesize with `review-fix-loop.md` Lane 2's **unattended variant** (the canonical statement of the extended chain: reversibility → behavior preservation → blast radius → higher confidence → least action → first option in the framing — logging which terminal rule fired).
 4. Log in `plans/<branch>.md` Decisions section; surface meaningful ones in the PR comment.
 5. Proceed.
 
-Never bail to the user mid-run. (The confidence / least-action / first-option extensions are a deliberate divergence from Lane 2, whose real chain is the first three criteria then escalate true ties to the user via its end-of-loop report; this protocol runs unattended, so ties resolve to the leave-as-is / no-op option when one is present, else the first option in the framing — and get logged.)
+Never bail to the user mid-run.
 
 Use heavily in Step 6 (semantic conflict analysis) and Step 7b (conflict resolution direction — run there by the resolver, for conflicts Step 6 did not pre-decide).
 
@@ -242,29 +265,45 @@ The opinion leaf is a real `Agent` dispatch — inside the per-PR stage-agent th
 # Commit any straggler review/test-fix edits first — `git push` ships only commits,
 # and Step 3 bailed on dirty worktrees, so any dirt here is this run's own work.
 if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -m "fix: post-merge review/test fixes"; fi
-git push                                                    # to PR head ref
+# Capture the merged-state SHAs for the plans record NOW — before the plans commit and the
+# push — so they name the merge+fixes state (Step 12's template uses these, not the post-push
+# COMMENT_* below, which would include the plans commit itself).
+MERGE_RESULT_SHORT=$(git rev-parse --short HEAD)
+MAIN_MERGED_SHORT=$(git rev-parse --short "origin/$BASE_BRANCH")
+# Append + commit plans/<branch>.md NOW (Step 12's template) — BEFORE the push, so one
+# push carries merge + fixes + plans and the record reaches the PR. Committing plans
+# after the push would strand it locally: the record never appears in the PR diff, and
+# the reused worktree diverges from remote after any later author push.
+git push origin "HEAD:<pr-branch>"                          # same-repo PR
+# Fork PR (maintainer-edit): git push "$FORK_REMOTE" "HEAD:<pr-branch>"
+# Always name remote + refspec: a bare `git push` (no upstream set on this branch)
+# either fails or — under push.default=current/autoSetupRemote — creates a junk
+# origin/<pr-branch> and "succeeds" without updating the PR (the silent
+# wrong-destination push pr-auto-review Step 12 documents).
 COMMENT_BRANCH_SHORT=$(git rev-parse --short HEAD)
 COMMENT_MAIN_SHORT=$(git rev-parse --short "origin/$BASE_BRANCH")
 ```
 
-`COMMENT_BRANCH_SHORT` and `COMMENT_MAIN_SHORT` are used in Step 14's footer. `COMMENT_MAIN_SHORT` is not strictly required for idempotency (Step 5 uses git state), but it's useful forensic context.
+`COMMENT_BRANCH_SHORT` and `COMMENT_MAIN_SHORT` are the post-push captures used in Step 14's footer and the Step 13 block — distinct from the pre-push `MERGE_RESULT_SHORT`/`MAIN_MERGED_SHORT` the Step 12 plans record uses. `COMMENT_MAIN_SHORT` is not strictly required for idempotency (Step 5 uses git state), but it's useful forensic context.
 
 This is the run's only push and it goes to the PR's **own head ref** — `$BASE_BRANCH` is never pushed, and nothing here authorizes the stage-agent's children to push anything (the irreversible tail stays with the stage-agent).
 
 Failure handling:
 
 - **Fork without maintainer-edit** → can't push the merge. Bail with a comment: *"Couldn't push merged state — fork without maintainer-edit. Enable 'Allow edits by maintainers' and re-run."* (Patches in a comment aren't useful for a merge — it's a multi-commit operation; user needs to merge themselves.) Capture `COMMENT_*` SHAs at the pre-push branch state for the failure comment.
-- **Non-fast-forward rejection** → branch moved underneath us. Re-fetch; if trivial rebase, do it and retry; if not, bail with comment.
+- **Non-fast-forward rejection** → branch moved underneath us. Re-fetch; **merge** the new remote commits into the merged state (`git merge <push-remote>/<pr-branch> --no-edit` — never rebase here: HEAD carries Step 7's merge commit, and a rebase silently drops it and replays main's merged commits as PR-branch commits) and retry the push once; if that merge conflicts (`git merge --abort` first) or the retry is rejected, bail with comment.
 
-## Step 12 — Append `plans/<branch>.md` (always)
+On either unresolvable-push bail, after capturing the failure-comment SHAs: restore the worktree — `git reset --hard "$PRE_MERGE_HEAD"` (this run's own unpushed commits only) — so a later re-run starts from the remote PR state instead of a stranded local merge.
 
-Per the global CLAUDE.md worktree-plans convention. Create-or-append. If umbrella missing, create the scaffold first. Append:
+## Step 12 — `plans/<branch>.md` template (the append + commit run in Step 11, pre-push)
+
+Per the global CLAUDE.md worktree-plans convention. Create-or-append — **executed in Step 11, before the push** (the ordering is load-bearing; see the Step 11 comment). If umbrella missing, create the scaffold first. Append:
 
 ```markdown
 ## /auto-merge-main run, <YYYY-MM-DD>
 
-**Branch SHA (post-merge)**: `<COMMENT_BRANCH_SHORT>`
-**Main SHA (merged)**: `<COMMENT_MAIN_SHORT>`
+**Branch SHA (post-merge)**: `<MERGE_RESULT_SHORT>`
+**Main SHA (merged)**: `<MAIN_MERGED_SHORT>`
 **Main commits merged**: <count> (`<merge-base>..origin/main`)
 **Conflicts**: <count> textual, <count> semantic
 **Tough decisions during resolution**: <count>
@@ -279,9 +318,9 @@ Per the global CLAUDE.md worktree-plans convention. Create-or-append. If umbrell
 - <bullet per decision flagged meaningful>
 ```
 
-Commit the plans file update.
+(The commit itself happens in Step 11, before the push.)
 
-For the skip case (Step 5 bail): the plans file update is optional. If the umbrella exists, append a one-line entry noting the skip date and main SHA; if not, don't create one just to record a skip.
+For the skip case (Step 5 bail): **no plans update** — the skip comment is the record. This path never pushes, so an append would strand state either way (uncommitted dirt → the next run's Step 3 false-bails; a local commit → divergence after any author push — the exact strand Step 11's ordering rationale exists to prevent).
 
 ## Step 13 — Per-item report block
 
@@ -317,39 +356,38 @@ Branch already contains current `<BASE_BRANCH>`. No merge needed.
 ## Step 14 — Post PR comment
 
 ```bash
-gh pr comment <N> --body "$(cat <<EOF
+BODY_FILE=$(mktemp)
+cat > "$BODY_FILE" <<'EOF'
 ## /auto-merge-main
 
 **Outcome**: <Merged main into branch and pushed | Failed: <reason>>
 
 ### Main commits merged
-<count> commits from \`<merge-base>..origin/main\`
+<count> commits from `<merge-base>..origin/main`
 
 ### Conflicts
 - Textual: <count>
 - Semantic: <count>
 
 ### Conflict resolutions [omit section if zero]
-- \`<file>\` — <how resolved> — <consult outcome if applicable>
+- `<file>` — <how resolved> — <consult outcome if applicable>
 
 ### Meaningful decisions made (<count>) [omit if zero]
-- <decision> — <rationale> — consult outcome: <converged | resolved-divergence | tied>
+- <decision> — <rationale> — consult outcome: <converged | resolved-divergence | single-source> (review-fix-loop Lane 2's vocab; annotate the terminal rule when the extended chain decided)
 
 ### Review loop
 <stop reason, fixes applied, decisions, escalations>
 
 ### Tests
 <ran (passed) | ran (failed N times after fix attempts) | skipped>
-
----
-*Generated by \`/auto-merge-main <N>\` via Claude Code @ branch=$COMMENT_BRANCH_SHORT main=$COMMENT_MAIN_SHORT.*
 EOF
-)"
+printf -- '\n---\n*Generated by `/auto-merge-main <N>` via Claude Code @ branch=%s main=%s.*\n' "$COMMENT_BRANCH_SHORT" "$COMMENT_MAIN_SHORT" >> "$BODY_FILE"
+gh pr comment <N> --body-file "$BODY_FILE"
 ```
 
 The `@ branch=<sha> main=<sha>` is forensic context; idempotency in Step 5 does not depend on parsing it (git state is authoritative). Don't omit it — operators reading the comment expect to see the SHAs.
 
-(Note unquoted `EOF` so `$COMMENT_BRANCH_SHORT` and `$COMMENT_MAIN_SHORT` expand. Backslash-escapes on literal backticks keep them as Markdown in the comment.)
+(The **quoted** `<<'EOF'` body delimiter is load-bearing: conflicted filenames and resolution/decision summaries are PR-derived or quote code — an expanding heredoc would run `$(...)`/backtick substitution on them at comment time. Backticks are typed plainly. The footer is appended by `printf`, the only expanding step, carrying just the two run-controlled SHAs. Step 5's skip comment keeps its unquoted heredoc — its body interpolates only run-controlled variables.)
 
 ## Step 15 — Final report (dispatcher)
 
@@ -361,11 +399,11 @@ Assemble per-item blocks — N=1 gets the same flow with one block. Push notific
 
 ## Hard rules
 
-- Never force-push. Never delete branches. Never use `git reset --hard` to "clean up" a bad merge — use `git merge --abort` if mid-merge, otherwise `git revert <merge-sha>`.
+- Never force-push. Never delete branches. Never use `git reset --hard` to "clean up" a bad merge — use `git merge --abort` if mid-merge, otherwise `git revert <merge-sha>` for anything pushed. One tightly-scoped exception: the post-merge bail restore (`git reset --hard "$PRE_MERGE_HEAD"` — Steps 8/9/11) discards only this run's own unpushed commits, in this run's worktree.
 - Never push a merge with broken tests (Step 9 bail).
 - Never push a merge with regression detected by `/review-fix-loop` (Step 8 bail).
 - Never push to fork PRs without maintainer-edit (Step 11 bail).
-- Never bail to the user except per the explicit bail conditions: unresolvable conflict (7c), test exhaustion (9), regression (8), uncommitted-work-in-worktree (3), unresolvable push failure (11), branch-state divergence (4), or idempotent skip (5 — which is a no-op, not a failure). Everything else → tough-decision protocol, log, proceed.
+- Never bail to the user except per the explicit bail conditions: unresolvable conflict (7c), test exhaustion (9), regression (8), uncommitted-work-in-worktree (3), unresolvable push failure (11), branch-state divergence (4), idempotent skip (5 — which is a no-op, not a failure), or the pre-flight bails (Step 0 no-PR, Step 1 hard blockers, Step 2 no-Agent-tool). Everything else → tough-decision protocol, log, proceed.
 - Keep-interactive: anything `AskUserQuestion`-driven or needing the live conversation stays on the main loop — dispatched stage-agents carry no `AskUserQuestion` tool at all. This command has no such step by design (judgment calls go to Step 10); but if a nested invocation ever surfaces a question only the human can answer, return it as **data** in the per-item block and let the main loop surface it (e.g. via `/askme`) — never improvise the answer, never hang.
 - Step 2's 4-in-flight cap holds for any caller — an outer command driving this one inherits it; it doesn't re-derive or lift it.
 - Always honor `git merge --abort` if a merge gets too tangled to safely commit; bail with comment rather than push a half-baked tree.
@@ -376,11 +414,11 @@ Assemble per-item blocks — N=1 gets the same flow with one block. Push notific
 - **Branch behind remote in non-trivial way** → bail at Step 4 with comment, don't merge.
 - **Uncommitted work in worktree** → bail at Step 3 with comment, don't merge.
 - **Idempotent skip: branch already contains current main** → Step 5 skip; post brief comment; per-item block reads `skipped-no-changes`. Not a failure.
-- **Unresolvable git conflict** → `git merge --abort`, bail with comment listing the file and reason.
+- **Unresolvable git conflict** → `git merge --abort`, restore `plans/`, bail with comment listing the file and reason.
 - **Tough-decision consult both no-confidence on a semantic-conflict resolution** → fall back to "preserve PR's intent, adapt PR's surface to main's new API." If even that's unclear, bail with comment.
-- **`/review-fix-loop` regression detected** → don't push, post comment with the regression details.
-- **Tests failing after 5 fix attempts** → don't push, post comment.
+- **`/review-fix-loop` regression detected** → don't push; reset to `PRE_MERGE_HEAD`, post comment with the regression details.
+- **Tests failing after 5 fix attempts** → don't push; reset to `PRE_MERGE_HEAD`, post comment.
 - **Fork without maintainer-edit** → bail with comment asking user to enable it.
-- **Push rejected non-fast-forward** → try once to rebase merged state onto current remote; if non-trivial, bail.
+- **Push rejected non-fast-forward** → re-fetch, merge the new remote commits into the merged state (never rebase — it drops the merge commit), retry once; conflicts or rejected again → bail.
 - **Codex unavailable** → degrade to Claude-only consults. Flag once.
 - **One per-PR stage-agent fails** → the others continue. Failed item's block reads `### PR #<N> — failed: <reason>`.

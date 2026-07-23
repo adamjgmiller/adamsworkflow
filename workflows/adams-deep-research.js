@@ -4,7 +4,7 @@
 export const meta = {
   name: 'adams-deep-research',
   description: 'Model-tiered deep research — unbounded search angles, Sonnet fan-outs, session-model scope/synthesis, adversarial 3-lens verification; tiers overridable via args.',
-  whenToUse: 'When the user wants a deep, multi-source, fact-checked research report on any topic. BEFORE invoking, check if the question is specific enough to research directly — if underspecified (e.g., "what car to buy" without budget/use-case/region), ask 2-3 clarifying questions to narrow scope. Then pass the refined question as args, weaving the answers in. Fork of the built-in deep-research: angle count scales with the question (not fixed at 5), mechanical/unbounded stages pinned Sonnet, scope+synthesis inherit the session model, and central claims get one Opus verifier by default. Args: a plain question string, or {question, maxModel, models:{scope,search,fetch,verify,opusVoter,synthesize}} — pass maxModel:"sonnet" when the run must stay Sonnet-only (it clamps the Opus voter escalation and pins the otherwise session-inherited scope/synthesize stages; never pass a tier above the session model).',
+  whenToUse: 'When the user wants a deep, multi-source, fact-checked research report on any topic. BEFORE invoking, check if the question is specific enough to research directly — if underspecified (e.g., "what car to buy" without budget/use-case/region), ask 2-3 clarifying questions to narrow scope. Then pass the refined question as args, weaving the answers in. Fork of the built-in deep-research: angle count scales with the question (not fixed at 5), mechanical/unbounded stages pinned Sonnet, scope+synthesis inherit the session model, and central claims get one Opus verifier by default. Args: a plain question string, or {question, maxModel, models:{scope,search,fetch,verify,opusVoter,synthesize}} — pass maxModel:"sonnet" when the run must stay Sonnet-only (it clamps the Opus voter escalation and pins the otherwise session-inherited scope/synthesize stages; never pass a tier above the session model). Args must be a REAL JSON object, not a JSON string (a stringified object is auto-recovered with a loud warning); unrecognized tiers (e.g. "fable" — express session-tier by omission) and typo\'d stage names warn instead of silently no-opping. For a field-mapping/survey report driven by a written request file, use adams-field-research instead.',
   phases: [
     { title: "Scope", detail: "Decompose question (from args) into as many angles as it warrants (3-12)" },
     { title: "Search", detail: "One searcher per angle", model: "sonnet" },
@@ -114,8 +114,19 @@ const REPORT_SCHEMA = {
 
 // ─── Phase 0: Scope — decompose question into search angles (inherits session model) ───
 phase("Scope")
-const OPTS = (args && typeof args === "object" && !Array.isArray(args)) ? args : {}
-const QUESTION = ((typeof args === "string" ? args : (typeof OPTS.question === "string" ? OPTS.question : "")) || "").trim()
+let OPTS = (args && typeof args === "object" && !Array.isArray(args)) ? args : {}
+// Guard (added 2026-07-19): args passed as a JSON-encoded STRING — the documented Workflow-args
+// gotcha — used to silently become the question text, dropping all model control. Recover it, loudly.
+if (typeof args === "string" && args.trim().startsWith("{")) {
+  try {
+    const parsed = JSON.parse(args)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.question === "string") {
+      OPTS = parsed
+      log("WARNING: args arrived JSON-stringified — recovered {question, maxModel, models} by parsing. Pass args as a real JSON object next time.")
+    }
+  } catch {}
+}
+const QUESTION = ((typeof OPTS.question === "string" ? OPTS.question : (typeof args === "string" ? args : "")) || "").trim()
 if (!QUESTION) {
   return { error: "No research question provided. Pass it as args: Workflow({name: 'adams-deep-research', args: '<question>'}) — or args: {question, maxModel, models} for model control." }
 }
@@ -128,6 +139,19 @@ if (!QUESTION) {
 const TIERS = ["haiku", "sonnet", "opus"]
 const MAX_MODEL = TIERS.includes(OPTS.maxModel) ? OPTS.maxModel : null
 const STAGE_MODELS = (OPTS.models && typeof OPTS.models === "object" && !Array.isArray(OPTS.models)) ? OPTS.models : {}
+// Guard (added 2026-07-19): unrecognized tiers (e.g. "fable") and typo'd stage names used to
+// no-op silently. Warn loudly; behavior is unchanged (they are still ignored).
+const KNOWN_STAGES = ["scope", "search", "fetch", "verify", "opusVoter", "synthesize"]
+if (OPTS.maxModel !== undefined && !TIERS.includes(OPTS.maxModel)) {
+  log("WARNING: maxModel '" + OPTS.maxModel + "' is not one of " + TIERS.join("|") + " — IGNORED. (Session-tier/fable is expressed by omission, not by name.)")
+}
+for (const k of Object.keys(STAGE_MODELS)) {
+  if (!KNOWN_STAGES.includes(k)) {
+    log("WARNING: models." + k + " is not a known stage (" + KNOWN_STAGES.join(", ") + ") — IGNORED.")
+  } else if (!TIERS.includes(STAGE_MODELS[k])) {
+    log("WARNING: models." + k + " = '" + STAGE_MODELS[k] + "' is not one of " + TIERS.join("|") + " — IGNORED; that stage falls back to its default.")
+  }
+}
 const clampTier = m => (MAX_MODEL && TIERS.indexOf(m) > TIERS.indexOf(MAX_MODEL)) ? MAX_MODEL : m
 const pick = (stage, dflt) => clampTier(TIERS.includes(STAGE_MODELS[stage]) ? STAGE_MODELS[stage] : dflt)
 // For the two default-unpinned stages: explicit override wins (clamped), else maxModel

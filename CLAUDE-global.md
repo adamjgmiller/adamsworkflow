@@ -4,7 +4,7 @@
 >
 > **How to adopt it.** Merge the sections you want into your own `~/.claude/CLAUDE.md`, selectively — each section stands alone. Or hand this file to your Claude and ask it to merge the sections that fit your setup. Model tier names (Fable > Opus > Sonnet > Haiku) mean strongest → cheapest; map them onto whatever tiers you actually run.
 >
-> Generalized from the live config on 2026-07-18. The live original keeps evolving through the **Config feedback** loop below — which is why it comes first.
+> Generalized from the live config on 2026-07-18; re-synced to it 2026-07-20. The live original keeps evolving through the **Config feedback** loop below — which is why it comes first.
 
 # Config feedback
 
@@ -23,11 +23,13 @@ For a meaningful change in a repo — more than a quick edit — run the Build S
 - Meaningful repo change from a raw request → `/build-system` (owns docs → build → PR; see its tiering).
 - GitHub issues to resolve, or an existing PR to review/ship → `/ship-issues` (PR-stage review + fix + promote: `/pr-auto-review`; PR behind main: `/auto-merge-main`).
 - Non-code or mixed deliverable (research, proposal, brand, docs) wanting a bespoke team + judge → `/teamwork`.
+- Deep multi-source research report (answering a question) → `/adams-deep-research` — not the built-in `deep-research`, which lacks the fork's schema + model-control fixes.
+- Comprehensive field-mapping/survey report (a domain's people, orgs, literature, tooling, engagement routes) driven by a written request/contract file → `/adams-field-research` — dispatcher authors payload-complete research assignments inline (planning is session-tier work); fan-outs hard-pinned Sonnet, synthesis inherits session model.
 - Long unattended goal that must not stop for questions → `/auto-run <goal + methodology>`.
 - Batch decisions/questions for me → `/make-it-easy` (walkthrough page) or `/askme` (inline); stress-test a plan with me → `/grill-me`.
 
 **Review tiers** (one shared finding format, severity `critical|high|medium|low|nit`):
-`/quick-review` = one Claude pass (cheapest; needs no Agent tool — inline for leaves and others' work, one fresh-eyes sub-agent when reviewing its own session's edits and it can spawn) → `/dual-review` = + one detached Codex, deduped (leaf-safe) → `/lens-review` = per-lens Opus+Codex fan-out, read-only (widest). Loop any of them with `/review-fix-loop <cmd>` — fix, re-review, stop on convergence/steady-state/regression (default cap 5 rounds, 3 when wrapping `/lens-review` — convergence to no meaningful findings is the goal; the cap is the cost guard). PR-bound review + fix + promote → `/pr-auto-review`. Default lens-review breadth for non-trivial or risky diffs, dual-review for light passes; when unsure, lean thorough.
+`/quick-review` = one Claude pass (cheapest; needs no Agent tool — inline for leaves and others' work, one fresh-eyes sub-agent when reviewing its own session's edits and it can spawn) → `/dual-review` = + one detached Codex, deduped (leaf-safe) → `/lens-review` = per-lens Opus+Codex fan-out, read-only (widest). Loop any of them with `/review-fix-loop <cmd>` — fix, re-review, stop on convergence/steady-state/regression (default cap 5 rounds, 3 when wrapping `/lens-review` — convergence to no meaningful findings is the goal; the cap is the cost guard). PR-bound review + fix + promote → `/pr-auto-review`. Default lens-review breadth for non-trivial or risky diffs, dual-review for light passes; when unsure, lean thorough. **Post-convergence fresh-eyes gate** (optional pattern, outcome-proven): after a convergence loop on critical text/config, run ONE fresh session-tier adversarial pass over the full accumulated diff (tier per the escalation test) — it catches knock-ons of the loop's own fixes against unedited text; fix its findings + one targeted verification, and the verification never re-triggers the gate — iterating further is my explicit call. (Grounded 2026-07-18: 7 validated findings after an 8-round converged loop; 12 one-shot on another critical-config file.)
 
 # Authorization grants (decide your own)
 
@@ -37,6 +39,8 @@ My live config carries two standing grants that are deliberately **not** reprodu
 - **Autonomous skills finishing their own PRs.** When the owner invokes a skill whose documented exit is a ready PR, the invocation itself is treated as authorization for that skill's *documented deliverable actions* — e.g. promoting the owner's own draft PR to ready once convergence conditions are met, or posting the skill's own review-summary comment. The principle: judge each leaf action against the contract of the skill that was invoked, not in isolation. The grant stays bounded to **reversible** actions on repos the owner controls, with hard exclusions that always require asking first: repos outside the owner's control, merging, force-pushing `main`, `--admin`/`--no-verify`, external communications to people outside the session, deleting data outside the repo, deploys, real spend.
 
 If you want either behavior, write the grant in your own words in your own CLAUDE.md. Nothing in this file grants it — without your explicit grant, the default remains: push and publish only when asked.
+
+**Attribution trailers.** Two commit/PR trailers travel with autonomous work, and they generalize differently. A `Co-Authored-By` trailer stays on every commit in every repo — honest authorship, never stripped. A session-URL trailer (a link back to the originating session) is private-repo only: keep it on commits there for traceability, but omit it in **public** repos — in both commits and PR bodies — since to an outside reader it is an auth-walled dead link plus internal workflow metadata. The PR-body "Generated with Claude Code" footer stays everywhere.
 
 # Changing code
 
@@ -63,6 +67,8 @@ A substantial HTML page built to communicate with me — report, deep-dive, walk
 **The brief must be payload-complete**: every fact, number, quote, and diff the page will show goes in the brief (or a handoff file written first) — "read X and figure it out" is where delegation fidelity dies. If the page IS the synthesis, do the synthesis first, then delegate only the assembly. After the build, spot-check the page's load-bearing claims against the brief (the observed failure mode is plausible misattribution, not bad design), then serve it yourself per the serving rule below.
 
 **Carve-out — permanent/critical reference pages** (grounded 2026-07-05: a when-to-use-which guide): when the page is a long-lived reference to my own system and the content was synthesized in-session, the briefing hop is the dominant risk — build it inline as the main agent (reusing the visual-page design system), or recommend that. Routine communication pages stay delegated.
+
+**Code-visual route — `/guided-tour`:** code walkthroughs (a diff, subsystem, or codebase tour) go through `/guided-tour`, never visual-builder. Session-scope tours build inline (the content is the session context); cold scopes (branch/range/path/PR/codebase) delegate wholesale to one `general-purpose` sub-agent following the command file via a pointer brief — the content is on disk, so the pointer is payload-complete — with `model:` passed per this section's tiering. Both reuse the visual-page design system.
 
 # Preview servers & teardown
 
@@ -102,7 +108,7 @@ Don't delegate judgment calls — "based on your findings, fix the bug" pushes t
 
 # Worktrees
 
-`EnterWorktree` cannot *create* a worktree while the session is already in one (probed 2026-07-02). Chain worktrees with: `git worktree add <main-repo>/.claude/worktrees/<name> -b <branch> origin/<default>`, then `EnterWorktree` with `path`.
+`EnterWorktree` cannot *create* a worktree while the session is already in one (field-notes §10). Chain worktrees with: `git worktree add <main-repo>/.claude/worktrees/<name> -b <branch> origin/<default>`, then `EnterWorktree` with `path`.
 
 # Plan artifacts (`plans/`)
 
@@ -112,7 +118,7 @@ Maintain `plans/<branch>.md` at the repo (or worktree) root as the branch's umbr
 
 **Umbrella file** — frontmatter: branch, base, started; body lightweight, no rigid template. Create on first session in a worktree (or when the Build System engages) with a metadata stub (Goal `_TBD_`), filling Goal in as intent emerges; read at session start before substantive work whenever one exists; update proactively on meaningful events (decisions, docs created/revised, scope changes, dead-ends), not trivial edits.
 
-**Commit & review** — commit all of them; they merge to main with the branch and appear in PR diffs, where review passes treat them as reviewable artifacts. Never gitignore or stash them before review.
+**Commit & review** — commit the umbrella and every sidecar you created; they merge to main with the branch and appear in PR diffs, where review passes treat them as reviewable artifacts. Never gitignore or stash them before review.
 
 **Migrating existing projects** — if a project has non-conforming plan-like files (root `PLAN.md`, `notes/`, `docs/decisions/`), surface them and ask whether to (1) reorganize into `plans/<branch>-*`, (2) move to `plans/old/` and start fresh, or (3) leave as-is and apply only to new branches. Don't migrate without explicit direction.
 

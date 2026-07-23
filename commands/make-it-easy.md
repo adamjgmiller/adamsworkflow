@@ -16,9 +16,9 @@ When you need the user's input on several things — or need to walk them throug
 
 3. **Serve it yourself** (so it outlives the sub-agent). Bash with `run_in_background: true`:
    ```
-   cd "<RUN_DIR>" && python3 server.py
+   cd "<RUN_DIR>" && rm -f state/PORT && python3 server.py
    ```
-   The server binds a **free port** (multi-instance safe) and writes it to `<RUN_DIR>/state/PORT`. By default, serve on 127.0.0.1 (localhost-only). To open pages from other devices, opt in explicitly: bind 0.0.0.0 on a trusted network, or preferably bind a private tailnet/VPN interface (e.g. Tailscale) — see the README's serving section. (`MIE_BIND=<iface>` sets the bound interface; `MIE_HOST=<your-host>` sets the hostname the printed URL uses.)
+   The server binds a **free port** (multi-instance safe) and writes it to `<RUN_DIR>/state/PORT`. The `rm -f` matters when re-serving an existing run dir: step 4 reads whatever port file exists, and a dead prior server's stale port would win the race. By default, serve on 127.0.0.1 (localhost-only). To open pages from other devices, opt in explicitly: bind 0.0.0.0 on a trusted network, or preferably bind a private tailnet/VPN interface (e.g. Tailscale) — see the README's serving section. (`MIE_BIND=<iface>` sets the bound interface; `MIE_HOST=<your-host>` sets the hostname the printed URL uses.)
 
 4. **Get the URL and hand it over:**
    ```
@@ -30,7 +30,7 @@ When you need the user's input on several things — or need to walk them throug
    ```
    python3 ~/.claude/scripts/make-it-easy/mie.py wait "<RUN_DIR>"
    ```
-   It blocks until the user taps "Send to Claude" (the `state/SUBMITTED` sentinel), then prints `state.json` and the harness re-invokes you. If it prints `WAIT_TIMEOUT` (24h default) or they wander off, that's fine — answers are on disk; just pick them up from `<RUN_DIR>/state/state.json` on their next message. Never block the foreground or fall back to re-asking in text.
+   It blocks until the user taps "Send to Claude" (the `state/SUBMITTED` sentinel), then prints `state.json` and the harness re-invokes you. If it prints `WAIT_TIMEOUT` (24h default) or they wander off, that's fine — answers are on disk; just pick them up from `<RUN_DIR>/state/state.json` on their next message. Never block the main loop or fall back to re-asking in text.
 
 6. **Resume the real work.** Parse `state.json` → `answers[cardId]` = `{choice, choices[], notes, discuss, confirmed}`. A `choice`/`choices` is their pick; `notes` is free text — weigh it heavily; `discuss: true` means raise that one with them live in chat. After parsing, kill the page server (purpose-bound per your global CLAUDE.md's preview-URL teardown rule; the run dir keeps everything and can be re-served anytime) — unless they wandered off without submitting, in which case leave it for the wrap-up sweep. Then carry on with whatever the page was deciding.
 

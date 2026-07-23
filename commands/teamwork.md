@@ -109,9 +109,8 @@ right one depends on the task. Choose by **which produces the more thorough, rel
   messaging it — the strategist who revises after a critic's attack is the *same* teammate,
   messaged, not a fresh agent that lost the thread. Unnamed dispatch for bounded work you want back now
   (its result comes to you in its completion notification); **named teammates** for long-running
-  parallel roles — and you (the main loop) **own all named teammates**, since a teammate can fan
-  out its own leaves but **can't collect them by return value or notification** — those route to
-  *you*, not the teammate (see the file-handoff rule below).
+  parallel roles — and you (the main loop) **own all named teammates**: the roster is flat and
+  only the leader creates teammates (mandatory mechanics below).
 - **Hybrid across phases is allowed and often best.** A convergent build phase as a Workflow; an
   exploratory or implementation phase the CEO wants to sit in on as named teammates. Pick per
   phase.
@@ -138,17 +137,15 @@ deliberately and commit to its mechanics.
   Design the org **flat, not deep**: named peers *you* create, coordinated by messaging — never a
   hierarchy of agents spawning named agents.
 - **A teammate's leaf dispatches are SYNCHRONOUS — each blocks until the leaf returns, result
-  inline (load-bearing — `~/.claude/docs/field-notes.md` §4; probed 2026-07-15 on v2.1.210,
-  superseding the 2026-07-10 orphan-trap probe).** When a named teammate fans out its own unnamed
-  leaves (e.g. the Head of Strategy running blind judges), each Agent call returns the leaf's full
-  final text in the tool result — collection just works, and the old failure (leaf results
-  orphaning to *your* inbox while the stopped teammate never woke) is structurally closed; the
-  file-handoff workaround is no longer required for collection. The catch now is **throughput**:
+  inline (load-bearing — `~/.claude/docs/field-notes.md` §4).** When a named teammate fans out
+  its own unnamed leaves (e.g. the Head of Strategy running blind judges), each Agent call
+  returns the leaf's full final text in the tool result — collection just works. The catch is
+  **throughput**:
   batched named-teammate dispatches' concurrency is untested — assume its leaves run one at a
   time, each blocking its turn. So give a teammate only small bounded leaf work (a pair of blind
   judges, a lookup), and run any wide or long fan-out yourself at the orchestrator level, where
   unnamed dispatches are async and genuinely concurrent (count dispatches, collect every
-  completion notification before the join — §4). File handoff (leaf writes a known path,
+  completion notification before the join — field-notes §4). File handoff (leaf writes a known path,
   teammate Reads it) stays the belt-and-braces for outputs that must survive a lost turn.
 - **Name every teammate by its role** via the `Agent` `name:` param — `name: "CMO"`, `name: "PM"`,
   `name: "BrandCritic"`, `name: "Copywriter"`. A "named teammates" run with zero names set is a
@@ -172,7 +169,10 @@ deliberately and commit to its mechanics.
   bottlenecked through you. Messaging is **outbound-only and push-delivered**: there's no inbox to
   poll; a reply simply arrives as the teammate's next turn — so design *send-then-continue* flows,
   not *wait-for-reply* loops. Teammates reach you with `to: "main"`; you stay aware (watch the agent
-  view, hold coherence and the CEO interface). (Workflow agents are leaves and **can't** message
+  view, hold coherence and the CEO interface). Brief every teammate that terminal deliverables —
+  the judge's sign-off above all — go out as a `SendMessage(to: "main")` final act, never a plain
+  final turn (which doesn't surface reliably — field-notes §4); file handoff stays the
+  belt-and-braces. (Workflow agents are leaves and **can't** message
   each other — a reason to pick named teammates when collaboration matters.)
 - **Use the shared task board to assign and track work** (`TaskCreate` / `TaskUpdate` / `TaskList`,
   available to every teammate): one board task per deliverable, `owner` = the teammate, status moved
@@ -199,7 +199,7 @@ deliberately and commit to its mechanics.
 - **The message channel is small and unthrottled — don't overload it.** There's no
   backpressure and no bounded queue: a fast teammate can flood a slow one, burying the
   signal and bloating the receiver's context with a wall of messages it must wade through
-  at its next turn. Each message is also capped (~10KB). So keep messages **small, sparse,
+  at its next turn. Each message is also capped (~10KB — estimate; field-notes §10). So keep messages **small, sparse,
   and coalesced** — one consolidated update over five rapid-fire ones — and put **bulk or
   authoritative payloads in files or the task board, sending only the path/pointer**, never
   the contents. This is the volume-flip-side of the stale-message rule above: that one
@@ -286,7 +286,8 @@ battle-tested. **Wrap it; don't rebuild a worse version inside the team.**
   its existence.
 
 Composition rule: never bury a "is this clean enough to stop?" judgment inside a deterministic
-Workflow — that's your call. And never let delegation launder a gate (a push, a deploy, an
+Workflow — that judgment lives outside the script, with the named judge (§3): you route the
+Workflow's result to them for the binding verdict. And never let delegation launder a gate (a push, a deploy, an
 external write) past the CEO.
 
 ## 5 — Autonomy and when to involve the CEO

@@ -3,7 +3,7 @@ description: Turn GitHub issues (or an existing PR) into validated, reviewed, re
 argument-hint: "[<issue#>...] [review #<pr>] [deploy #<pr>] [and deploy | and ship | waterfall]"
 ---
 
-Turn one or more GitHub issues (or an existing PR) into a reviewed, ready-to-merge PR — and optionally ship it. Two execution paths, picked in Step 2. The **default Task path** lifts the judgment-bearing stages onto main-loop **stage-agents**: one per issue for resolve — each fans out its own leaf children per this file's Appendix (the retired `/issue-auto-resolve`'s per-issue recipe) — and the review stage invokes **`/pr-auto-review` for real** (it always-delegates internally now). The **Path-B Workflow** path remains for fixed-shape fan-outs and background runs: there you author and run a Workflow script that reproduces the care at the *script* level, because Workflow-spawned agents still cannot nest sub-agents (on that fabric the fan-out has to live in the script, not in a delegated command).
+Turn one or more GitHub issues (or an existing PR) into a reviewed, ready-to-merge PR — and optionally ship it. The **default Task path** (Step 2A) lifts the judgment-bearing stages onto main-loop **stage-agents**: one per issue for resolve — each fans out its own leaf children per this file's Appendix (the retired `/issue-auto-resolve`'s per-issue recipe) — and the review stage invokes **`/pr-auto-review` for real** (it always-delegates internally now). A parked **Path-B Workflow** variant exists for genuinely fixed-shape fan-outs and detached background runs — `~/.claude/docs/ship-issues-pathB.md` (cold but supported; it reproduces the care bar at script level because Workflow agents cannot nest sub-agents).
 
 The skill's own job is the things the underlying commands don't do:
 1. **Validate each issue is still worth doing** — already-fixed / obsolete / false-positive / superseded-by-comment → early-exit, no PR. Tiered: quick by default, adversarial for auto-filed/stale/uncertain.
@@ -31,21 +31,12 @@ Examples:
 
 ## The care bar — meet it natively or reproduce it, never skip it
 
-On the Task path (Step 2A) the left column runs **for real**: the review stage *is* `/pr-auto-review`, and the resolve stage-agent fans out the same critique/lens batteries itself per the Appendix. The right column is the **Path-B (Step 2B)** bar — on the Workflow fabric you reproduce that care at script level:
-
-| Native command care | Path-B Workflow reproduction (script-level) |
-|---|---|
-| plan dual-critique, ≤3 rounds (Appendix F) | **meaningful only**: `parallel(opus-critique, codex-critique)` → revise plan → loop ≤3 |
-| resolution review-fix loop (was `/issue-auto-resolve`) | **meaningful only**: `while(review-fan-out → fix → re-review)` until converge |
-| `pr-auto-review` per-lens Opus+Codex fan-out | `parallel(lens-agents + codex-per-lens)`; simple = 1–2 lenses, meaningful = wide set |
-| `review-fix-loop` convergence/regression/max-rounds | script `while`: stop on **convergence** (clean round) / **regression** / **max-rounds** |
-| draft-then-ready promotion | open draft → `gh pr ready` only if the PR-review loop converged clean + tests pass |
-| validate the *suggested fix* against real code | resolve agent must verify cited lines/behavior before editing (issues' own fixes are often wrong — e.g. wrong column name) |
+On the Task path (Step 2A) the care runs **for real**: the review stage *is* `/pr-auto-review`, and the resolve stage-agent fans out the same critique/lens batteries itself per the Appendix — plan dual-critique ≤3 rounds (F), the resolution review loop, the per-lens PR fan-out, convergence/steady-state/regression/max-rounds stops, draft-then-ready promotion, and validate-the-suggested-fix-against-real-code. On the parked Path-B, the same bar is reproduced at **script level** — the reproduction table lives in `~/.claude/docs/ship-issues-pathB.md`; never skip it there.
 
 ## Step 0 — Parse `$ARGUMENTS` + route
 
 - **Issue numbers** → full pipeline from Resolve (Step 2).
-- **`review #<pr>`** → start at the review stage only — no resolve. Default: invoke `/pr-auto-review <pr>` for real (Step 2A's review stage); on Path-B: R5–R6 over the existing PR.
+- **`review #<pr>`** → start at the review stage only — no resolve. Default: invoke `/pr-auto-review <pr>` for real (Step 2A's review stage); on the parked Path-B: R5–R6 only (`~/.claude/docs/ship-issues-pathB.md`).
 - **`deploy #<pr>` / `ship #<pr>`** → skip to Deploy (Step 4).
 - **Trailing `and deploy` / `and ship` / `waterfall`** → run Deploy (Step 4) after the PRs are ready. `waterfall` (or ≥2 PRs) → waterfall mode.
 - **Default exit**: stop at ready PR(s). Deploy only when explicitly asked.
@@ -92,13 +83,13 @@ A full run is just this gate plus the stages after it: **validate → (confirmed
 
 ## Step 2 — Resolve → review (pick the execution path first)
 
-Two ways to run the same stage chain. Default to **2A**; use **2B** where the Workflow layer genuinely earns its keep:
+Two ways to run the same stage chain. Default to **2A**; the parked **2B** (Workflow fabric — `~/.claude/docs/ship-issues-pathB.md`) only where that layer genuinely earns its keep:
 
-| | **2A — Task stage-agents (default)** | **2B — Path-B Workflow** |
+| | **2A — Task stage-agents (default)** | **2B — Path-B Workflow (parked)** |
 |---|---|---|
 | Fabric | main loop dispatches per-issue stage-agents that nest | JS Workflow script; its agents are leaves |
 | Right for | judgment-bearing resolve + review (the normal case) | genuinely **fixed-shape** fan-outs (a known lens battery over a known diff, no mid-stage judgment) · running the whole pipeline detached in the **background** while the conductor stays free |
-| Review stage | invoke `/pr-auto-review` for real | reproduce at script level (mandatory on this fabric — its agents hold no Agent tool, so a delegated fan-out command could only degrade to its inline fallback; ship-issues' care bar requires the real fan-out, reproduced in the script) |
+| Review stage | invoke `/pr-auto-review` for real | reproduce at script level (mandatory on this fabric — its agents hold no Agent tool, and a delegated fan-out command bails Agent-less; the care bar requires the real fan-out, reproduced in the script) |
 
 ### Step 2A — per-issue resolve stage-agents + `/pr-auto-review` for real (default)
 
@@ -129,9 +120,9 @@ main loop (conductor)
 
 **Fault isolation, per item** *(carried over — load-bearing, not a Workflow incidental)*: one issue's failure returns `{ok:false, stage, error}` in its bundle (or the dispatch itself errors — record it as that issue's failure); **the rest continue**. Report which stage failed per item.
 
-**Review stage = `/pr-auto-review`, invoked for real** (inline by this conductor — read and execute its file; an inline command costs no depth). It now **always** spawns one per-PR review agent — single-PR runs included — and carries **its own concurrency cap of 4**; that cap governs the review side, **inherited — never stack a second ship-issues cap on top of it**. When several PRs come ready together, batch them into one invocation and let its cap pace them. Its Step 14 PR comment carries unfixed findings + rationale, and its Step 16 per-item block returns stop/promotion state to this conductor — that's R5+R6, met natively. One Path-B care-bar item is per-invocation on this path, not per-round: `/pr-auto-review` scrapes bot/human PR signal once (its Step 6). If its run pushed fixes, late human comments — or external-bot output from a re-trigger; a push alone may re-trigger nothing — may land after it returns; in the once-over, re-check (`gh pr view <pr> --json comments,reviews`) and re-invoke `/pr-auto-review <pr>` if substantive new findings appeared (its before=/after= idempotency makes re-runs cheap).
+**Review stage = `/pr-auto-review`, invoked for real** (inline by this conductor — read and execute its file; an inline command costs no depth). It now **always** spawns one per-PR review agent — single-PR runs included — and carries **its own concurrency cap of 4**; that cap governs the review side, **inherited — never stack a second ship-issues cap on top of it**. When several PRs come ready together, batch them into one invocation and let its cap pace them. Its Step 14 PR comment carries unfixed findings + rationale, and its Step 16 per-item block returns stop/promotion state to this conductor — that's R5+R6, met natively. One Path-B care-bar item is per-invocation on this path, not per-round: `/pr-auto-review` scrapes bot/human PR signal once (its Step 6). If its run pushed fixes, late human comments — or external-bot output from a re-trigger; a push alone may re-trigger nothing — may land after it returns; in the once-over, re-check (`gh pr view <pr> --json comments,reviews`) and re-invoke `/pr-auto-review <pr>` if substantive new findings appeared (after fix pushes a re-invoke runs a full fresh review by design — its Step 4 proceed case; for a comments-only delta on an unchanged head, tell it to force past Step 4's SHA check).
 
-**Per-issue bundle** (the resolve stage-agent's entire return — the conductor parses nothing else):
+**Per-issue bundle** (the resolve stage-agent's entire return — the conductor parses nothing else; it is this flow's shape of the stage-runner def's generic bundle — `ok`/`sha`/`tests`/`decisions` carry the def's outcome / git-state / verify-result / digest fields):
 
 ```
 RESOLVE{ ok, issue, branch, worktree, pr_url, intensity, sha,
@@ -150,68 +141,16 @@ Stop-reason + unfixed/dropped findings must survive **two hops**: the stage-agen
 
 **Depth + counting** (Agent dispatch = +1, inline command = +0; field-notes §5): resolve = `main(0) → per-issue stage-agent(1) → critique/lens/codex leaves(2)` — 2 levels. Review = `/pr-auto-review` inline (+0) → `its per-PR agent(1) → lens + codex-runner children(2)`, and its inline fix-loop's review sub-agent(2) — no codex child; dual-review's Codex side is detached Bash inside it — 2 levels. Both inside the ~3–4 convention. Don't add levels: **this conductor — not the resolve stage-agent — invokes `/pr-auto-review`** (a stage-agent holding `Agent` *can* invoke it, but that pushes the chain to 3; reserve that for when the conductor's context is critically tight, and say so in the report).
 
-### Step 2B — Path-B Workflow (fixed-shape / background — kept, not retired)
+### Step 2B — Path-B Workflow (parked: cold but supported)
 
-Author **one Workflow script** (via the Workflow tool) that pipelines the issues, each carrying its own `intensity`. On this fabric every fan-out is a `parallel()` / `while` **in the script** (the fact block: workflow agents can't nest). The per-issue stage chain:
-
-```
-scaffold(group)                       # branch+worktree off origin/main; umbrella plans file always; sidecars if meaningful
-  └─ pipeline over issues (independent; no barrier):
-       R1 resolve
-            simple    → implement-agent (verify cited code first, apply fix, commit)
-            meaningful→ plan-agent → parallel(opus-critique, codex-critique) → revise ≤3 → execute-agent
-       R2 test         → targeted pytest, fix-loop ≤5 (meaningful: + add coverage where a contract moved)
-       R3 PRE-PR REVIEW
-            simple    → SKIP (one loop total)
-            meaningful→ while(round<MAX): parallel(lens-agents + codex) → dedup/validate → fix → re-review
-                        stop on clean / regression / MAX
-       R4 open DRAFT PR (Closes #<N>; body: provenance, decisions, review outcome, any post-deploy ops note)
-       R5 PR ADVERSARIAL REVIEW
-            simple    → ONE pass: parallel(1–2 lens-agents + codex) → dedup → fix obvious → done
-            meaningful→ while(round<MAX): parallel(WIDE lenses + codex-per-lens) → dedup/validate → fix → RERUN lenses
-                        stop on clean / regression / MAX
-       R6 promote: gh pr ready  iff (PR-review converged clean AND tests pass)
-```
-
-Reference template to adapt (JS — Path-B; same shape proven in this session). Tunables encode the intensity dial:
-
-```js
-export const meta = { name: 'ship-issues', description: 'resolve → review → ready PR (intensity-scaled)', phases: [
-  {title:'Scaffold'},{title:'Resolve'},{title:'Test'},{title:'Pre-PR review'},{title:'PR review'},{title:'Finalize'}] }
-
-const REPO = '<repo abs path>'
-// per-issue: { n, intensity:'simple'|'meaningful', branch, spec, lenses, test_targets }
-const ITEMS = args   // pass the sized issue list in as Workflow args
-
-const knobs = (it) => it.intensity === 'meaningful'
-  ? { plan_critique:true, prepr_loop:true, pr_lenses: it.lenses /* wide */, MAX_ROUNDS:3 }
-  : { plan_critique:false, prepr_loop:false, pr_lenses: it.lenses.slice(0,2), MAX_ROUNDS:1 }
-
-// scaffold each branch+worktree off origin/main (serial, avoids .git lock races); umbrella plans file always.
-// then: pipeline(ITEMS, resolveStage, testStage, prePrReviewStage, finalizeOpenDraft, prReviewStage, promoteStage)
-// resolveStage: meaningful → planAgent → parallel(opusCrit, codexCrit·`model:'sonnet'`) → revise → executeAgent ; simple → executeAgent
-// prReviewStage: while(round<MAX){ const f = await parallel([...lenses.map(opusLens), codexLens]); const m = await dedup(f);
-//                 if(!m.length){converged=true;break} if(m.length>prev){break/*regression*/} await fix(m) }
-// codexLens agent (`model: 'sonnet'` — Codex-driver): "use codex-consult skill in review mode, or run `codex` CLI non-interactively on `git diff origin/main...HEAD`"
-```
-
-Notes:
-- **Codex per lens** runs *inside* an agent (workflow agents have Skill + Bash). If `codex` absent, run Opus-only and note it.
-- **Worktree-only scaffold — never touch the main checkout.** Create each branch+worktree in a serial scaffold stage (not concurrently — avoids `.git` lock races): `git -C <repo> worktree add -b <branch> <repo>/.claude/worktrees/<slug> origin/main` (slug = branch with `/`→`-`; append `-2`/`-3` if the path exists; symlink `.env` into it — see §D for the full snippet). EVERY later stage must `cd` into that worktree path. **NEVER** `git checkout`/`git switch` a feature branch in the main repo, **NEVER** `gh issue develop --checkout`, **NEVER** `gh pr checkout` — all mutate the main checkout. This applies to `simple` and `meaningful` identically. Clean up at the end — only worktrees this run created, and only once their PR is merged/closed with all work pushed: `git worktree remove <path>` (`--force` only when the leftover dirt is this run's own artifacts) + `git branch -D` for squash-merged branches. Never remove a pre-existing worktree, and never delete a branch with unpushed work.
-- **The PR-review stage scrapes existing PR signal too** — before fanning out lenses, an optional external PR bot can be folded in here if your repos use one (trigger it unless already triggered for the current head), then pull the PR's comments + review submissions (`gh pr view <pr> --json comments,reviews` + `gh api repos/:owner/:repo/pulls/<pr>/comments`): bot findings and human comments. Dedup against them and treat any maintainer comment as authoritative (same rule as issues). (On the Task path, `/pr-auto-review` Step 6 does the scrape + dedup natively; the maintainer-comment-is-authoritative rule is this command's own addition on both paths.)
-
-#### Proven authoring mechanics (carried over from a prior hand-built workflow — fold these into the script you write)
-
-- **Reuse the command prose by section-citation; don't re-write it.** Brief agents as *"follow `~/.claude/commands/ship-issues.md` Appendix A–E"* or *"use the prescribed findings format in `pr-auto-review.md` Step 7 (the Opus lens reviewer brief)"* — the agent reads the cited sections itself. Keeps the authored script thin and the source-of-truth in the command files (no drift). This is what makes "write the workflow fresh each run" safe.
-- **Schema every agent return** (so you parse nothing): `FINDINGS{source, findings[]{severity,location,summary,detail,suggestion}, notes}` · `SYNTH{meaningful[]{severity,location,summary,fix,attribution}, dropped[]{summary,reason}}` · `SETUP{ok,branch,worktree,error}` · `FIX{ok,fixed_count,pushed,notes}` · `FINALIZE{promoted,tests,comment_url}`.
-- **Dual-source per lens = a paired leaf**: `parallel(opusLeaf, codexLeaf)` (per-lens model per the model-selection policy for `opusLeaf` — Opus default, Fable only for a lens passing the policy's escalation test; `codexLeaf` is a Codex-driver → `model: 'sonnet'`). **Brief the `opusLeaf` (and every `prePrReviewStage` / `prReviewStage` lens agent) read-only on the tree** — workflow agents hold Edit/Write, so a lens agent must be told it reviews and returns findings only: never edit/create/delete files, mutate git state, or mutation-test the shared worktree (running the suite as-is is fine); only the resolve / `fix(m)` stage edits. The codex leaf invokes the `codex-consult` skill (review mode) — already read-only via `--sandbox read-only` — and **degrades gracefully**: codex-absent/error → return `findings:[] notes:"codex-unavailable"`, never throw.
-- **Re-scrape bot/human review signal EACH PR-review round** (not just once): human comments land mid-loop, and after a round pushes fixes, re-trigger your external bot (if one is in play) when its take on the new head is wanted — a push alone may re-trigger nothing. Skip resolved threads + prior workflow / `/pr-auto-review` summary comments.
-- **Track the stop reason** per PR — `convergence` (clean round) / `steady-state` (a fix round fixed 0 or didn't push) / `regression` (findings rose) / `max-rounds` — and surface it + any unfixed/dropped findings (with rationale) in the single summary PR comment. (Same rule the Task path enforces via the RESOLVE bundle + `/pr-auto-review`'s comment — the data path is identical on both fabrics.)
-- **Promote iff** `clean` AND tests pass/skipped AND **no unfixed meaningful findings** — else leave draft with the reason.
-- **Fault-isolate each issue**: wrap each item's chain so one failure returns `{ok:false, stage, error}` and the rest continue; report which stage failed.
-- **Keep `pipeline()` — no barrier.** Each issue flows resolve→review independently (lower wall-clock). The prior workflow used an all-resolves-then-all-reviews barrier; don't regress to that for independent issues.
-
-When entry is **`review #<pr>`** on Path-B: skip R1–R4; run only R5–R6. **Find or create a worktree on the PR's branch and work there — never `gh pr checkout` into the main repo.** Reuse an existing worktree on that branch if one exists (respect its uncommitted work); otherwise fetch the branch and `git worktree add <repo>/.claude/worktrees/<slug> <branch>`. (On the Task path this paragraph is `/pr-auto-review`'s own Step 3 — it finds-or-creates the worktree with the same discipline.)
+The Workflow-fabric variant — the per-issue stage chain, the reference JS template, the
+script-authoring mechanics, and the `review #<pr>` adaptation — lives in
+**`~/.claude/docs/ship-issues-pathB.md`**. Reach for it only where the Workflow layer
+genuinely earns its keep: **fixed-shape fan-outs** (a known lens battery over a known
+diff, no mid-stage judgment) or **running the whole pipeline detached in the
+background**. The care bar applies in full there (reproduced at script level — Workflow
+agents cannot nest, so a delegated fan-out command would just bail); this file's
+Step 0–1.5 routing, the Appendix briefs, and the hard rules govern both paths.
 
 ### Whichever path ran — the once-over
 
@@ -226,14 +165,14 @@ Report the ready PR(s) + each one's review-round count + promotion status. If de
 Neither a workflow nor a dispatched sub-agent can do this: deploy must pause on safety-window conflicts / failures, and a dispatched sub-agent carries **no AskUserQuestion tool** — every ask a deploy command encodes (dirty tree, red checks, permission-probe failure, a stale in-flight job, the anomaly valve) would be swallowed. Run it **inline on the main loop**, reproducing the deploy command's care. If your repo encodes its deploy choreography in its own command(s) — single-PR merge-and-deploy, multi-PR waterfall — **follow them inline** (the main loop holds the user channel, so every encoded ask can fire). Do **not** dispatch a per-deploy sub-agent — it can't fire those asks. Honor:
 
 - **Deploy-safety pre-check** before each deploy — if the repo encodes a pre-deploy probe battery (in-flight pipelines, live jobs/campaigns, imminent cron), run it via the repo's own single-sourced probe — never restate or reimplement the probes here. Auto-wait until clear; never deploy into a conflict window.
-- **Waterfall merge-main judgment**: deliberate ship-issues override of an unconditional merge-main step: before merging PR #N+1, run `git merge-tree --write-tree origin/main <branch>` — merge `main` in first **only if it's behind AND the diffs overlap**; if disjoint, skip `/auto-merge-main` and let the squash-merge handle it.
+- **Waterfall merge-main judgment**: deliberate ship-issues override of an unconditional merge-main step: before merging PR #N+1, merge `main` in first **only if it's behind (`git merge-base --is-ancestor origin/main <branch>` fails) AND the diffs overlap** (intersect the two sides' `git diff --name-only <merge-base>..X` path sets — `git merge-tree --write-tree origin/main <branch>` alone can't make this call: disjoint and overlapping-but-clean both print a tree OID; keep merge-tree as the conflict probe, whose conflict exit forces the merge-first path regardless); if disjoint and conflict-free, skip `/auto-merge-main` and let the squash-merge handle it.
 - **Multi-worktree gh quirk**: `gh pr merge --squash --delete-branch` may exit 1 with *"'main' is already used by worktree …"* — that's local checkout failure only; verify `state=MERGED` on the remote, then delete the branch manually.
 - **Post-deploy ops ordering**: deploy the code FIRST, then run any backfill (e.g. a migration backfill) against prod — never before. Capture a before/after to confirm it landed. Authorize the prod mutation explicitly.
 - **Stop on failure**: red `ci.yml` on main, `deploy.yml` failure/rollback → stop and report; no fix-forward.
 
 ## Step 5 — Final report
 
-Per-item: issue → PR url → intensity → review rounds (pre-PR / PR; Task path: the PR-side rounds map to `/pr-auto-review`'s Step 16 block fields — use what the block provides, don't invent a number) → promoted? → deployed? + any post-deploy ops result. Push notification: `/ship-issues done — <P> ready, <D> deployed, <F> failed.`
+Per-item: issue → PR url → intensity → review rounds (pre-PR / PR; Task path: the PR-side rounds map to `/pr-auto-review`'s Step 16 block fields — use what the block provides, don't invent a number) → promoted? → deployed? + any post-deploy ops result. Report header states which fabric ran — `fabric: task (2A)` or `fabric: path-B workflow` — the usage telemetry any future Path-B retirement decision reads; the same value is recorded durably in each issue's umbrella frontmatter (Appendix E), so the telemetry survives the chat. Push notification: `/ship-issues done — <P> ready, <D> deployed, <F> failed.`
 
 ## Hard rules
 
@@ -247,7 +186,7 @@ Per-item: issue → PR url → intensity → review rounds (pre-PR / PR; Task pa
 - Verify each issue's *suggested fix* against the real code before applying it.
 - **Never resolve an unvalidated issue** (Step 1.5). Early-exit with no PR on already-resolved / obsolete / false-positive, and report it for closing — a skip is a valid outcome. Escalate auto-filed / stale / uncertain issues to the adversarial validate pass.
 - **Read ALL comments, not just the body** — on every issue *and* PR (`--json comments` / `--comments`; plain `gh issue view`/`gh pr view` does NOT include comment bodies). A maintainer's answering comment is authoritative: it can resolve an open question, change scope, pick an approach, or cancel the fix. Latest maintainer guidance wins.
-- Read the returned diffs in main context and do the once-over before promoting/deploying.
+- Read the returned diffs in main context and do the once-over before any deploy (promotion happens inside the review stage — a substantive once-over finding on an already-promoted PR → re-invoke `/pr-auto-review`).
 
 ## Failure modes
 
@@ -257,20 +196,20 @@ Per-item: issue → PR url → intensity → review rounds (pre-PR / PR; Task pa
 - **resolve stage-agent fails mid-stage** → its bundle (or the dispatch error) reports `{ok:false, stage, error}`; the other issues continue — fault isolation is per-issue. Report which stage failed.
 - **stage-agent hits a human-only question** → it returns the pending question as data in its bundle (Appendix H governs what it may decide itself); the main loop surfaces it. It must never guess through a reserved decision and never hang.
 - **tests fail after fix-loop** → leave the PR draft, note it; CI is the final gate.
-- **PR-review doesn't converge (hits MAX / regression)** → the PR stays draft with the open findings: Task path — `/pr-auto-review` leaves it draft and its comment + per-item block carry the unfixed findings and stop reason; Path-B — leave draft with the open findings in the body. Do not promote.
+- **PR-review doesn't converge (hits MAX / steady-state / regression)** → the PR stays draft with the open findings: Task path — `/pr-auto-review` leaves it draft and its comment + per-item block carry the unfixed findings and stop reason; Path-B — leave draft with the open findings in the body. Do not promote.
 - **deploy safety-window won't clear** → auto-wait (bounded waits have no time cap); escalate only when the wait is **non-converging** (a wedged run with no terminal state and no crash log, a stale `running` job, or no probe-derived endpoint).
 - **review #<pr> on a fork without maintainer-edit** → fixes go as patches in a PR comment, don't promote.
 
 ## Notes on coupling
 
-- **Two fabrics by design.** Resolve/review run on the Task fabric (Step 2A — main-loop stage-agents that nest, plus `/pr-auto-review` invoked for real); fixed-shape and background runs stay on the Workflow fabric (Step 2B), where script-level fan-out remains mandatory because **Workflow agents still cannot nest** (field-notes §1). Path-B is not obsolete.
+- **Two fabrics by design.** Resolve/review run on the Task fabric (Step 2A — main-loop stage-agents that nest, plus `/pr-auto-review` invoked for real); fixed-shape and background runs stay on the Workflow fabric — parked at `~/.claude/docs/ship-issues-pathB.md`, where script-level fan-out remains mandatory because **Workflow agents still cannot nest** (field-notes §1). Path-B is cold but supported, not obsolete.
 - User-level command; the deploy stage assumes a repo with its own encoded deploy choreography. In a repo without one, stop at ready PRs (Step 4 is a no-op) unless an equivalent deploy command exists.
 
 ---
 
 ## Appendix — per-issue resolve recipe (absorbed from the retired `/issue-auto-resolve`)
 
-This was the body of `/issue-auto-resolve`, kept here as citable source-of-truth. On the Task path these sections are the **resolve stage-agent's brief** (cited from Step 2A); on Path-B they're the **script's section-citations** (cited from the authoring mechanics) — either way, brief agents as *"follow `~/.claude/commands/ship-issues.md` Appendix <letters>"* so the consuming layer stays thin and the source-of-truth lives here (no drift). Text is harmonized with this skill's hard rules (worktree-only; the two-fabric rule — a Workflow agent running these sections cannot nest sub-agents, a Task stage-agent fans out its own leaf children). The old command's orchestration steps (dispatch, execute-the-plan, /review-fix-loop invocation, final report) are superseded by this skill's main body and are not reproduced. `/pr-auto-review` and `/auto-merge-main` used to cite the old Steps 9/11 — they now carry their own copies; G/H below serve resolve agents. **One dispatch rule governs every fan-out below (C investigate, F critique pair, H consult pair, the pre-PR lens loop): dispatches are async-only — each leaf's result arrives as a task-notification that re-wakes a stopped parent; count the fan-out's dispatches and collect every leaf's notification before advancing the stage (field-notes §4).**
+This was the body of `/issue-auto-resolve`, kept here as citable source-of-truth. On the Task path these sections are the **resolve stage-agent's brief** (cited from Step 2A); on Path-B they're the **script's section-citations** (cited from the authoring mechanics) — either way, brief agents as *"follow `~/.claude/commands/ship-issues.md` Appendix <letters>"* so the consuming layer stays thin and the source-of-truth lives here (no drift). Text is harmonized with this skill's hard rules (worktree-only; the two-fabric rule — a Workflow agent running these sections cannot nest sub-agents, a Task stage-agent fans out its own leaf children). The old command's orchestration steps (dispatch, execute-the-plan, /review-fix-loop invocation, final report) are superseded by this skill's main body and are not reproduced. G/H below serve resolve agents. **One dispatch rule governs every fan-out below (C investigate, F critique pair, H consult pair, the pre-PR lens loop): dispatches are async-only — each leaf's result arrives as a task-notification that re-wakes a stopped parent; count the fan-out's dispatches and collect every leaf's notification before advancing the stage (field-notes §4).**
 
 ### A. Pre-flight (per repo)
 
@@ -305,36 +244,34 @@ Worktree-only, per the hard rules — never check out the branch in the main rep
 # NEVER gh issue develop --checkout. If skipping this, rely on "Closes #<N>" in the PR body.
 gh issue develop <N>
 BRANCH=$(gh issue develop --list <N> --json refName --jq '.[0].refName')
-git fetch origin "${BRANCH}:${BRANCH}" 2>/dev/null || git fetch origin "$BRANCH"
-
-# Materialize a worktree at Claude's default location (append -2/-3 on collision).
-# Anchor at the MAIN checkout root, not the current worktree: `git rev-parse
-# --show-toplevel` would nest .claude/worktrees/ inside a worktree if run from one.
-# `--git-common-dir` resolves to the shared <main>/.git from anywhere; its parent
-# is the main root. (--path-format=absolute needs git >= 2.31.)
-GIT_COMMON=$(git rev-parse --path-format=absolute --git-common-dir)
-REPO_ROOT=$(dirname "$GIT_COMMON")
-SLUG="${BRANCH//\//-}"                              # slashes → dashes for the dir name
-WORKTREE="${REPO_ROOT}/.claude/worktrees/${SLUG}"
-SUFFIX=""; i=2
-while [ -e "${WORKTREE}${SUFFIX}" ]; do SUFFIX="-${i}"; i=$((i+1)); done
-WORKTREE="${WORKTREE}${SUFFIX}"
-# .claude/worktrees/ is git-excluded by Claude's native worktree feature; add the
-# exclude here too so this Bash-created worktree never shows in `git status`.
-# Leading \n guards an exclude file that lacks a trailing newline.
-grep -qxF '**/.claude/worktrees/' "${GIT_COMMON}/info/exclude" 2>/dev/null \
-  || printf '\n**/.claude/worktrees/\n' >> "${GIT_COMMON}/info/exclude"
-git worktree add "$WORKTREE" "$BRANCH"
-# (No gh issue develop? Create branch at add time: git worktree add -b <branch> "$WORKTREE" origin/main)
-cd "$WORKTREE"
-# Belt-and-suspenders .env symlink so tests / the app see real secrets. (If your
-# setup installs a post-checkout githook that symlinks .env on `git worktree add`,
-# this inline copy just covers the window before that hook exists.) Don't clobber
-# a real .env — only link if absent or already a symlink.
-if [ -e "${REPO_ROOT}/.env" ] && { [ -L "${WORKTREE}/.env" ] || [ ! -e "${WORKTREE}/.env" ]; }; then
-  ln -sfn "${REPO_ROOT}/.env" "${WORKTREE}/.env"
-fi
+git fetch origin "${BRANCH}:${BRANCH}" 2>/dev/null || {
+  # Refused = non-ff (local has commits origin lacks) or the branch is checked
+  # out in an existing worktree. This fallback updates origin/<branch> ONLY —
+  # the local ref stays stale, and the add below would seed from it.
+  git fetch origin "$BRANCH"
+  git rev-list --count "origin/${BRANCH}..${BRANCH}"   # >0 → diverged, see below
+}
 ```
+
+If that count is >0, the local branch carries commits the remote lacks (likely a
+crashed prior run's unpushed work): do NOT scaffold this issue from either side —
+skip it and package an escalation (never silently seed a PR from the stale local
+ref; never delete unpushed work). A refusal with count 0 is the
+checked-out-in-a-worktree case — proceed; the materialization block's reuse path
+handles it.
+
+Then materialize the worktree per the **canonical worktree-materialization block** in
+`~/.claude/commands/pr-auto-review.md` Step 3 (marked in its snippet: GIT_COMMON anchor
+via `--git-common-dir` → `REPO_ROOT` → `SLUG` with `/`→`-` → `-2`/`-3` collision
+suffix → `**/.claude/worktrees/` exclude line → the add → post-add `.env` symlink),
+with this flow's deltas:
+
+- The **conductor** runs it **serially** per issue (Appendix D is the serial scaffold —
+  no flock wrapper needed).
+- The add is `git worktree add "$WORKTREE" "$BRANCH"`; with no `gh issue develop`
+  branch, create at add time: `git worktree add -b <branch> "$WORKTREE" origin/main`.
+- The resolve agent's first action is `cd "$WORKTREE"` (the one line of this appendix
+  it performs itself).
 
 ### E. Plan files
 
@@ -347,6 +284,7 @@ base: main
 started: <YYYY-MM-DD>
 issue: #<N>
 command: /ship-issues
+fabric: <task (2A) | path-B workflow>
 ---
 
 # <Branch title>
@@ -430,8 +368,8 @@ Anywhere in the resolve flow the agent faces a genuinely tough judgment call it 
 
 1. **Frame the decision** — one paragraph: what's being decided, the options, the trade-offs.
 2. **Fan out two consults in parallel**: an opinion agent (`model: opus`/`fable` per the model-selection policy) and Codex (`codex-consult` `ask` mode, dispatched `model: sonnet` — Codex-driver), both briefed with the decision statement + relevant context (and explicitly read-only — form the opinion by reading the code; never edit files or mutate git state), asked for **Recommendation / Rationale (2-3 sentences) / Confidence (high|medium|low) / Needs user input? (yes|no)**. (Fabric note: a Task stage-agent dispatches the Opus opinion as a leaf child and runs Codex via a codex leaf; a Workflow agent cannot dispatch — it forms the Opus-side opinion inline itself and drives Codex via the codex-consult skill. H's tough calls otherwise shouldn't ride Path-B — see the 2B routing rule.)
-3. **Synthesize** with the `review-fix-loop.md` Lane 2 tiebreakers, lexicographic: reversibility → behavior preservation → blast radius → higher confidence → least action (prefer the leave-as-is / no-op option when one is present) → first option in the framing (note which terminal rule fired explicitly in the log). (The confidence / least-action / first-option extensions are a deliberate divergence from Lane 2, whose real chain is the first three criteria then escalate true ties to the user via its report; this protocol runs unattended.)
-4. **Log** in the umbrella Decisions section: decision, options, consult outcome (converged | resolved-divergence | tied), rationale, and `meaningful: yes` if a human would want to review it in the PR.
+3. **Synthesize** with `review-fix-loop.md` Lane 2's **unattended variant** (the canonical statement of the extended chain: reversibility → behavior preservation → blast radius → higher confidence → least action → first option in the framing). Note which terminal rule fired explicitly in the log.
+4. **Log** in the umbrella Decisions section: decision, options, consult outcome (converged | resolved-divergence | single-source — review-fix-loop Lane 2's vocab, terminal rule annotated when the extended chain decided), rationale, and `meaningful: yes` if a human would want to review it in the PR.
 5. **Proceed.**
 
 This is the autonomy escape valve, not a license to ask the user — the user sees the decisions in the PR body and decision log. (One boundary stands above it: a condition your dispatch brief *reserves for the human* — e.g. anything irreversible outside your commit/push contract — is not a tough call to consult on; return it **packaged as data** in your bundle and let the main loop surface it.)

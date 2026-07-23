@@ -40,8 +40,8 @@ Read-only. For code-writing, drive Codex write-mode deliberately (`codex exec --
      Preserves muscle memory from the old `/codex-review <scope>` form.
    - **No args**: if `git status --porcelain` is non-empty OR the current
      branch is ahead of its base → `review` mode. Otherwise stop and ask
-     the user which mode they want — do **not** guess between `critique`
-     and `ask`.
+     the user which mode they want — do **not** guess between `critique`,
+     `ask`, and `audit`.
 
 ## The four gotchas (load-bearing)
 
@@ -71,8 +71,8 @@ command for the scope:
 
 | Scope                          | Diff instruction to embed in the prompt                                       |
 |--------------------------------|-------------------------------------------------------------------------------|
-| Uncommitted changes            | `Start by running 'git status --short && git diff && git diff --cached'.`     |
-| Single commit (vs. its parent) | `Start by running 'git show --stat --patch <SHA>'.`                           |
+| Uncommitted changes            | `Start by running 'git status --short --untracked-files=all && git diff && git diff --cached'.` |
+| Single commit (vs. its parent) | `Start by running 'git show --first-parent --stat --patch <SHA>'.`            |
 | Single commit vs. a base       | `Start by running 'git diff <BRANCH>...<SHA>'.`                               |
 | Multi-commit branch range      | `Start by running 'git diff <base>...HEAD'.`                                  |
 
@@ -83,9 +83,9 @@ and embed a literal `A...B` when the caller's range names an endpoint.)
 `codex exec --sandbox read-only` reads the working tree
 directly, so it sees uncommitted changes the same way `--uncommitted`
 would have. The `exec` parser also handles `-c key=value` cleanly if
-a config override is needed (e.g. `-c model_reasoning_effort="xhigh"`;
-on GPT-5.6 models `max` exists above `xhigh` for a targeted
-deepest-pass override).
+a config override is needed (e.g. `-c model_reasoning_effort="max"` —
+on GPT-5.6 models `max` sits above the `xhigh` config default for a
+targeted deepest-pass override; overriding to `xhigh` is a no-op).
 
 Use `read-only`, not `workspace-write` or the deprecated alias
 `--full-auto` (which is `workspace-write` under the hood and emits a
@@ -172,7 +172,8 @@ for why `codex review` is off the table):
 
 The differentiation between modes lives in the prompt body itself —
 review mode embeds the per-scope `git` instruction from gotcha 1's
-diff-instruction table; critique/ask embed their artifact or question.
+diff-instruction table; critique/ask embed their artifact or question;
+audit embeds its file list + defect-class definition.
 
 **Step 2 — wait for the sentinel** (separate Bash tool call, with
 `timeout: 600000`):
@@ -191,6 +192,21 @@ echo "=== Log ==="; cat "$LOG_FILE"
 If the polling Bash call itself times out (rare — Codex >10 min),
 reissue the exact same `until` loop in another Bash call. The sentinel
 is file-based, so polling is fully resumable.
+
+**Total-wait ceiling (hung Codex).** A wedged `codex` process that never
+exits never writes the sentinel — reissued polls would wait forever and
+the caller's failure handling (which keys on `exit=N`) would never fire.
+After ~3 reissued polls (~30 min total) with no sentinel: treat the run
+as hung — kill the process tree, not just the wrapper (the recorded PID
+from the launch stdout is the backgrounded subshell, and `pkill -P`
+reaches only *direct* children — enumerate before killing, since orphans
+reparent and become unfindable: `pgrep -P <PID>` for the codex child,
+`pgrep -P <codex-pid>` for anything it spawned, then kill deepest-first,
+ending with `kill <PID>`), record a labeled
+failure (`exit=hung`) in place of the sentinel line, clean up this job's
+temp files, and return the failure so the caller's documented
+degradation (`single-source`, Opus-only lens, etc.) takes over. Never
+keep polling past the ceiling.
 
 **Do not** invoke Codex synchronously in the same Bash call that reads
 the log, even with `timeout: 600000`. You lose the ability to detect
@@ -286,14 +302,18 @@ construction you cannot wait for it passively.
 
    `<DIFF_INSTRUCTION>` per scope (Codex always runs the diff itself
    now — see gotcha 1):
-   - **Uncommitted**: *"Start by running `git status --short && git
-     diff && git diff --cached` to see all staged, unstaged, and
-     untracked changes, then read each untracked file the status
-     listed — the diffs omit new-file contents. Review the full
-     set."*
+   - **Uncommitted**: *"Start by running `git status --short
+     --untracked-files=all && git diff && git diff --cached` to see all
+     staged, unstaged, and untracked changes, then read each untracked
+     file the status listed — the diffs omit new-file contents. Review
+     the full set."* (`--untracked-files=all`: the default listing
+     collapses a wholly-untracked directory to one `dir/` entry, hiding
+     its files.)
    - **Single commit (vs. parent)**: *"Start by running `git show
-     --stat --patch <SHA>` to see the commit. Review the resulting
-     diff."*
+     --first-parent --stat --patch <SHA>` to see the commit. Review the
+     resulting diff."* (`--first-parent`: on a merge commit the default
+     combined diff shows nothing for cleanly-merged content —
+     probe-verified; first-parent shows what the commit brought in.)
    - **Single commit vs. a base**: *"Start by running `git diff
      <BRANCH>...<SHA>` to see the commit's effect relative to the
      base. Review the resulting diff."*
@@ -436,7 +456,14 @@ the prior round so Codex checks them for knock-ons instead of
 re-finding them, keep the do-not-re-raise list growing, and stop on an
 empty (or meaningless-only) round. The caller validates every finding
 against the actual files before fixing — Codex proposes, the caller
-disposes.
+disposes. In late rounds, bucket each survivor into documented-behavior
+divergence — the audited class, fix it — versus robustness or style
+suggestions, which the calibration bar rejects; a survivor count that stays
+flat late in a loop usually means the class definition is stretching to
+keep finding work, not that real defects remain. Adopt a soft cap of ~6
+rounds: stop there and log any leftovers as findings with an honest "not
+certified empty" note rather than looping further for a clean sweep that
+may not exist.
 
 ## Run and capture
 
@@ -466,7 +493,7 @@ disposes.
         cap{blk=blk $0 ORS} END{printf "%s", blk}' "$LOG_FILE")
 
    if [ -n "$(printf '%s' "$ANSWER" | tr -d '[:space:]')" ]; then
-     printf '%s\n' "$ANSWER"                      # the review/critique/ask body
+     printf '%s\n' "$ANSWER"                      # the mode's output body (all four modes)
    else
      # Empty extraction → fall back to the raw log, but log WHY first. A blank
      # result is a *symptom* (non-zero exit, a Codex error page, or a future CLI
@@ -475,7 +502,7 @@ disposes.
      # marker presence, and byte count so the real cause is legible:
      grep -qxE 'codex[[:space:]]*'       "$LOG_FILE" && M1=y || M1=n
      grep -qxE 'tokens used[[:space:]]*' "$LOG_FILE" && M2=y || M2=n
-     echo "codex-consult fallback: $(cat "$DONE_FILE" 2>/dev/null) codex_marker=$M1 tokens_marker=$M2 bytes=${#ANSWER} — reading raw log $LOG_FILE"
+     echo "codex-consult fallback: $(cat "$DONE_FILE" 2>/dev/null) codex_marker=$M1 tokens_marker=$M2 log_bytes=$(wc -c < "$LOG_FILE") — reading raw log $LOG_FILE"
      cat "$LOG_FILE"
    fi
    ```
@@ -486,14 +513,21 @@ disposes.
    program must stay a **single-quoted** shell string — double-quoted, the
    shell expands `$0` to the shell name before awk runs, and the
    extraction comes back empty (silently under bash, an awk fatal under
-   zsh), reproducing the false `$0`-drop diagnosis above. **Don't fall
+   zsh), reproducing the false `$0`-drop diagnosis above. Separately, a
+   Skill-load hazard: if this skill was invoked with args, the Skill tool
+   substitutes them into every dollar-zero token in the loaded text —
+   including this snippet's awk whole-line variable — so the recipe an
+   agent reads from the loaded skill can arrive garbled while the file on
+   disk stays correct; read the snippet from this file on disk (Read tool
+   on this SKILL.md path) before running it, never from Skill-loaded text
+   (field-notes §12). **Don't fall
    back silently** — the empty branch prints its reason so a downstream
    reader pins the real cause instead of guessing: `codex_marker=n` /
    `tokens_marker=n` means the CLI changed the marker format (verified
-   intact at v0.142.5; originally v0.136.0), and a non-`exit=0` sentinel
+   intact at v0.144.4; originally v0.136.0), and a non-`exit=0` sentinel
    means Codex itself errored. Surface findings/take to the conversation:
-   for `review`, preserve the numbered findings format; for `critique`/`ask`,
-   preserve Codex's section structure.
+   for `review`/`audit`, preserve the numbered findings format; for
+   `critique`/`ask`, preserve Codex's section structure.
 6. Clean up temp files (substitute the same `JOB_ID` literal you used
    for the wait step — only delete this job's files, never anything
    shared):
@@ -509,13 +543,13 @@ If Codex's exit code is non-zero, or the log is empty / clearly
 truncated, say so plainly — do not invent findings or paper over the
 failure.
 
-## When invoked as a Codex runner (from `/orchestrate`, `/pr-auto-review`, etc.)
+## When invoked as a Codex runner (from `/orchestrate`, `/pr-auto-review`, `/lens-review`, `/build-system`)
 
-`/orchestrate`'s post-execution once-over and `/pr-auto-review`'s
-per-lens reviewers dispatch a runner sub-agent **foreground** — the named
+`/orchestrate`'s post-execution once-over and the per-lens reviewers of
+`/pr-auto-review`, `/lens-review`, and `/build-system` dispatch a runner sub-agent — the named
 `codex-runner` def (`~/.claude/agents/codex-runner.md`), or a
-`general-purpose` sub-agent briefed to follow this skill — against a
-parent-supplied diff scope. (`/dual-review` does not dispatch a runner;
+`general-purpose` sub-agent briefed to follow this skill — against
+parent-supplied inputs (diff scope, or audit file list + defect class). (`/dual-review` does not dispatch a runner;
 it drives this skill inline.) The sub-agent's role in this context is
 **Codex runner**, not reviewer: the decision to consult Codex was
 already made by the parent. **Skipping is a failure mode, not an
@@ -528,9 +562,11 @@ That sub-agent should:
 
 1. Read this SKILL.md (it's the source of truth, not the orchestrate or
    pr-auto-review doc).
-2. Run in **`review` mode** with the scope the parent provided
-   (typically `<merge-base>...HEAD` for branch-range, or `uncommitted`).
-   Do not redetect scope — use what the parent passed.
+2. Run the **mode the parent supplied** — `review` when unstated — with
+   the parent's inputs: review takes a diff scope (typically
+   `<merge-base>...HEAD`, or `uncommitted`); `audit` takes the parent's
+   file list + defect-class brief (the audit-mode template above). Do
+   not redetect scope or mode — use what the parent passed.
 3. Return both:
    - **Proof of execution**: the `JOB_ID` and the sentinel `exit=N` line
      from `/tmp/codex-done-$JOB_ID.flag`. The parent uses these to

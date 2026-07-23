@@ -10,7 +10,9 @@ description: The end-to-end build pipeline — docs sized to the work (PRD + Pla
 # Build System
 
 Take a meaningful change from raw request to merge-ready PR: **Docs (tiered) → Build →
-Draft PR → Final Review**. Autonomous by default; adversarial review at every gate.
+Draft PR → Final Review**. Autonomous by default — the one sanctioned pause is Phase 1's
+PRD review on the large/ambiguous tier ("flow straight through" waives it); adversarial
+review at every gate.
 
 ## When to run
 - Inside a repo, for any request substantial enough to warrant more than a quick edit.
@@ -22,7 +24,7 @@ Draft PR → Final Review**. Autonomous by default; adversarial review at every 
 This is a conductor. It owns the phase structure and the entry point from a raw request,
 and delegates the heavy machinery to skills that already do it well:
 - Interrogate intent → `grill-me`
-- Codex second opinions / adversarial reviews → `codex-consult` (review / critique / ask;
+- Codex second opinions / adversarial reviews → `codex-consult` (review / critique / ask / audit;
   it encodes the Codex CLI gotchas)
 - Code review-fix loops → `review-fix-loop /lens-review` (per-lens Opus+Codex breadth,
   looped to convergence — the default for non-trivial/risky diffs) or `review-fix-loop
@@ -89,7 +91,7 @@ Where each delegated skill runs:
 | `lens-review` | **Conductor or stage-agent** | Per-lens fan-out — one Opus + one `codex-runner` leaf per lens, then dedup/validate against the diff — so its PRIMARY path needs the Agent tool: main loop **or a stage-agent that holds it**; never a Workflow `agent()` or a leaf (there it degrades to a single-process `degraded-fanout` pass). Read-only — it never fixes; pair it with `review-fix-loop /lens-review` for the loop. Pass an explicit scope; pin a specific lens set on **either** form (`review-fix-loop /lens-review <lenses>` forwards it every round via the loop's pass-through, or `/lens-review <lenses>` directly), or omit it to auto-pick per round. |
 | `grill-me` | **Top-level only** | Its job is a live AskUserQuestion interview; a delegated agent can't reach the user, and there's no inline substitute. For autonomous requirement-clarification inside a fan-out, use a non-interactive approach. |
 | `review-fix-loop` | **Conductor or stage-agent** | Itself a multi-round conductor that fans out review/fix/consult/apply sub-agents — so it needs the Agent tool: run it from the main loop **or from a delegated stage-agent that holds Agent**. Never from a Workflow `agent()` or a leaf. If a leaf must do review-and-fix, inline the essence: review + minimal Edits in one pass — no looping, no spawning. |
-| `pr-auto-review` | **Conductor or stage-agent** | Heavy orchestrator — per-lens reviewer pairs + embedded `review-fix-loop` + its own worktree — so it needs the Agent tool: main loop **or a stage-agent that holds it**. Never from a Workflow `agent()` or a leaf. (A degraded single-agent inline form exists — lenses applied sequentially, no fan-out — but prefer the real form.) pr-auto-review bundles its own per-PR concurrency cap (with within-PR fan-out accounting) — rely on it; don't re-derive a budget here, and never brief a stage-agent to lift it. |
+| `pr-auto-review` | **Conductor or stage-agent** | Heavy orchestrator — per-lens reviewer pairs + embedded `review-fix-loop` + its own worktree — so it needs the Agent tool: main loop **or a stage-agent that holds it**. Never from a Workflow `agent()` or a leaf — reached without `Agent` it bails with a clear error (no degraded inline mode). pr-auto-review bundles its own per-PR concurrency cap (with within-PR fan-out accounting) — rely on it; don't re-derive a budget here, and never brief a stage-agent to lift it. |
 | `orchestrate` | **Top-level only** | Per-stage build conductor with **user gates** (plan approval, halt-on-repeated-verify-failure) — interactivity, not spawn-depth, is what pins it to the main loop. Use *either* build-system's own Build loop *or* `orchestrate` as the top-level driver — never nest one in the other. |
 
 Pattern to copy: the conductor (or its stage-agent) fans out **one leaf per lens / per
@@ -111,7 +113,10 @@ is a consultant for a narrow class of questions only.
 - **Stop for the human only** when a decision (a) materially shapes user-facing behavior or
   product scope, (b) has no technical answer you're better-positioned to make, AND (c) you
   genuinely cannot proceed without it. Use AskUserQuestion. The human is a peer to consult
-  on product/UX judgment — not a tiebreaker for technical questions.
+  on product/UX judgment — not a tiebreaker for technical questions. Plus the one
+  structural pause: Phase 1's PRD review on the large/ambiguous tier (that tier exists
+  because alignment is genuinely needed; "flow straight through" waives it, and under
+  `/auto-run` the wrapper answers the gate itself).
 - **Delegation never moves these stops off the main loop.** Keep AskUserQuestion-driven and
   live-context steps with the conductor — a dispatched sub-agent carries no AskUserQuestion
   tool at all. Brief every stage-runner with the stop conditions above as its
@@ -135,16 +140,16 @@ The pipeline's core primitive. Given an artifact (a plan, or a code diff):
    dispatch `general-purpose` briefed to read and follow
    `~/.claude/agents/codex-runner.md`, pinned `model: sonnet` — Codex-driver) (brief it with the lens + scope; it returns
    JOB_ID + sentinel + raw findings); for a plan artifact, brief a leaf to run
-   `codex-consult critique` instead (pin that leaf `model: sonnet` — Codex-driver) — `codex-runner` is review-mode-only. **Codex
+   `codex-consult critique` instead (pin that leaf `model: sonnet` — Codex-driver) — `codex-runner` runs review/audit, not critique. **Codex
    preflight, once**: run `command -v codex` a single time before the first fan-out; if it
    fails, run every round with your own sub-agents alone, label the affected reviews
    `single-source`, and note it — do not make N leaves each rediscover that Codex is missing.
-3. Dedup findings by `(file, ~line, topic)`; fix every meaningful, critical, or blocking
-   issue. Skip cosmetic nits unless cheap.
+3. Dedup findings by `(file, ~line, topic)`; fix every `critical`/`high` finding, plus
+   `medium`/`low`/`nit` where cheap (the shared severity vocab).
 4. Commit the fixes (if in a repo), then re-run on the fixes, narrowing lenses to what
    changed.
-5. Stop when a round surfaces no meaningful/critical/blocking issue — or after a hard
-   ceiling of 5 rounds (absolute max 10). If you hit the ceiling with issues open, stop and
+5. Stop when a round surfaces no `critical`/`high` (or otherwise must-fix) issue — or
+   after a hard ceiling of 5 rounds (absolute max 10). If you hit the ceiling with issues open, stop and
    surface them rather than looping forever.
 
 For code, the loop has two ready-made forms — both run from the conductor or inline in a
@@ -184,7 +189,9 @@ the default for non-trivial diffs — forward the chosen lenses as pass-through 
 to auto-pick per round), or `review-fix-loop
 /dual-review` for a light pass — and returns the converged artifact + commit SHA(s) + a
 deduped findings/decisions digest. On
-return: verify the SHA resolves on HEAD (`git cat-file -e <sha>^{commit}`) before
+return: verify the SHA is an ancestor of HEAD (`git merge-base --is-ancestor <sha> HEAD`
+— worktrees share one object store, so a bare `cat-file -e` passes for any object
+anywhere in the repo; ancestry is the real check) before
 journaling or advancing — the diff is truth, recursively — and surface any packaged
 decision per the Autonomy section. **Depth:** phase-delegation already spends the first
 level — don't stack it with a *dispatched* review-fix-loop and `pr-auto-review` blindly;
@@ -253,6 +260,11 @@ promoting the PR; fix code or tests until green.
 ## Phases
 
 ### 0 — Size the docs (pick the tier first)
+**Branch first:** if HEAD is on the default branch, create/enter the feature branch (or
+worktree) now — every artifact below commits to it, and nothing in this pipeline ever
+commits to main (the global CLAUDE.md's never-commit-to-main rule; review-fix-loop Step 1
+runs the same preflight).
+
 Pick the documentation tier before writing anything; record the choice + a one-line
 reason in the umbrella:
 - **Large or ambiguous** — product-shaped, multiple defensible directions, or my
@@ -273,7 +285,7 @@ Unsure between tiers? Ask once with AskUserQuestion, then commit to the path.
    flooding main context with reads. (A Workflow still works when the fan-out shape is
    fixed.)
 2. Run `grill-me` to align with the user on exactly what belongs in the PRD. The interview
-   is live user interaction — it stays foreground; only the exploration delegates.
+   is live user interaction — it stays in the main loop; only the exploration delegates.
 3. Write `plans/<branch>-PRD.md`. Commit it.
 
 If the user said to flow straight through, continue without stopping; otherwise stop here
@@ -345,7 +357,7 @@ its work committed — never while another agent is actively mutating the branch
 hazard is two agents writing one tree, not duplicate worktrees. This rule governs the rest
 of the pipeline, Final Review included. Routing through `pr-auto-review` also requires a
 push-contract amendment: the stage-runner's default is never-push, but `pr-auto-review`
-executes its own side-effect tail (Step 11 push to the PR's head ref, Step 13 promote,
+executes its own side-effect tail (Step 12 push to the PR's head ref, Step 13 promote,
 Step 14 footer comment) inside its per-PR agents and never bubbles it up — so a brief that
 authorizes the route must explicitly extend push authorization to exactly that tail, and
 the conductor's own push/ready-flip steps become verify-only for whatever the route
@@ -355,13 +367,13 @@ Then flow into Final Review — unless told to stop at the Draft PR.
 
 ### 4 — Final PR Review
 A last, independent, **narrow** gate before recommending merge — fresh eyes looking only
-for critical/blocking issues, not the broad sweep Build already did. Delegation fits
+for `critical`/`high` issues, not the broad sweep Build already did. Delegation fits
 naturally here: the stage-runner starts with clean context — actual fresh eyes.
 1. Choose the lenses that matter for this change; delegate the gate to one `stage-runner`
    briefed with them (delegation brief above): it runs `/lens-review <those lenses>` (a
    read-only, single-pass per-lens fan-out — one `codex-runner` + one own leaf per lens,
    deduped and validated against the diff), with the narrow set **pinned** so the gate stays
-   focused. The stage-runner then fixes any critical/blocking finding and re-checks to
+   focused. The stage-runner then fixes any `critical`/`high` finding and re-checks to
    certainty (a short `review-fix-loop /lens-review <those lenses>` on the fixes — the set
    stays pinned via the loop's pass-through, naturally focused by the open findings) before
    committing. (If it routes the gate through `pr-auto-review` instead, Build's
