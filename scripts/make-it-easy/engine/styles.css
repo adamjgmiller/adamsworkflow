@@ -265,6 +265,9 @@ body {
   max-width: 60ch; margin-top: 16px;
 }
 .dek strong { color: var(--paper); font-weight: 600; }
+.dek ul, .dek ol { margin: 10px 0 0; padding-left: 1.2em; }
+.dek li { margin-top: 6px; }
+.dek li::marker { color: var(--lamp-soft); }
 
 /* listen pill */
 .listen {

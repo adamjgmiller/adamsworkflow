@@ -26,7 +26,7 @@ State the parsed plan back in one line before starting (e.g., *"Looping `/lens-r
 
 ## Step 1 — Establish `LOOP_BASE` and loop state
 
-Record the current HEAD SHA as `LOOP_BASE` (`git rev-parse HEAD`) and the loop's working tree as `WORKTREE` (`git rev-parse --show-toplevel`) — every lane brief below anchors its sub-agent to `WORKTREE`, and **the loop's own git commands (this checkpoint, 2e's commits, Step 4's reset) all run from it too** (when this loop runs inline inside a worktree-resident stage-agent, the session-default cwd is a *different* checkout). **If HEAD is on the default branch, create a working branch first** (name it `review-fix/<short LOOP_BASE SHA>` unless your dispatcher named one — Steps 4–5 report it) — before the checkpoint below, in every mode *including* `--no-commit`, and regardless of which ladder rule sets `REVIEW_BASE` (the global CLAUDE.md's never-commit-to-main rule: the checkpoint and per-round commits must never land on main even transiently — an interrupted run would strand them there; Step 4's reset then leaves you on the working branch with the changes staged). Then, if `git status --porcelain` is non-empty, commit the pre-loop state:
+Record the current HEAD SHA as `LOOP_BASE` (`git rev-parse HEAD`) and the loop's working tree as `WORKTREE` (`git rev-parse --show-toplevel`) — every lane brief below anchors its sub-agent to `WORKTREE`, and **the loop's own git commands (this checkpoint, 2e's commits, Step 4's reset) all run from it too** (when this loop runs inline inside a worktree-resident stage-agent, the session-default cwd is a *different* checkout). **If HEAD is on the default branch, create a working branch first** (name it `review-fix/<short LOOP_BASE SHA>` unless your dispatcher named one — Steps 4–5 report it) — before the checkpoint below, in every mode *including* `--no-commit`, and regardless of which ladder rule sets `REVIEW_BASE` (the global CLAUDE.md's never-commit-to-main rule: the checkpoint and per-round commits must never land on main even transiently — an interrupted run would strand them there; Step 4's reset then leaves you on the working branch with the changes staged; this in-place branch is your global CLAUDE.md § Worktrees' documented exception — the loop stays anchored to the checkout it starts in). Then, if `git status --porcelain` is non-empty, commit the pre-loop state:
 
 ```bash
 git add -A && git commit -m "checkpoint: pre-/review-fix-loop state"
@@ -45,9 +45,9 @@ Mandatory **even in `--no-commit` mode** — each round's review needs cumulativ
 
 State: *"Captured pre-loop state at `<LOOP_BASE_SHA>`; review scope `<REVIEW_BASE_SHA>...HEAD`."*
 
-Also set `RUN_DIR` = `<session scratchpad>/review-fix-loop/<short LOOP_BASE SHA>` and reset it (`rm -rf` then `mkdir -p` — a prior run at the same `LOOP_BASE`, e.g. a re-run after a `--no-commit` reset, would otherwise leave stale round reports the recovery path could mistake for this run's). Each round's 2a review agent writes its full report to `RUN_DIR/round-<r>-report.md` before returning — the recovery channel that survives lost completion notifications (field-notes §4).
+Also set `RUN_DIR` = `<session scratchpad>/review-fix-loop/<short LOOP_BASE SHA>` and reset it (`rm -rf` then `mkdir -p` — a prior run at the same `LOOP_BASE`, e.g. a re-run after a `--no-commit` reset, would otherwise leave stale round reports the recovery path could mistake for this run's). Each round's 2a review agent writes its full report to `RUN_DIR/round-<r>-report.md`, and the Lane 2 Claude consult its response to `RUN_DIR/round-<r>-consult.md`, before returning — the recovery channel that survives lost completion notifications (field-notes §4).
 
-Initialize, for use across rounds (tracked in the orchestrator's conversation context — the only on-disk artifacts are the 2a round-report files in `RUN_DIR`):
+Initialize, for use across rounds (tracked in the orchestrator's conversation context — the only on-disk artifacts are the round report and consult files in `RUN_DIR`):
 
 - `USER_PENDING`: set of findings to surface to the user at the end. Three kinds, distinguished by a `kind` field:
   - `preference` — bucketed directly as `USER_PREFERENCE` at intake (2b).
@@ -69,7 +69,7 @@ For each round `r` in `1..max_rounds`:
 
 **Round 1 with Seed findings:** skip this step — take the seed list directly into 2b. Every later round dispatches normally.
 
-**Dispatch it and collect its result before 2b.** Dispatches are async by default (async-only at depth; a main-level `run_in_background: false` sync opt-in exists — field-notes §4) — the review child's completion arrives as a task-notification carrying its report, attached to your next tool result or re-waking you if you've ended your turn. The same holds for every dispatch in this loop — the 2a review agent, Lane 1/3 fixers, the Lane 2 Claude consult: collect each one's notification before acting on its lane. Belt-and-braces: the 2a brief below makes the child write `RUN_DIR/round-<r>-report.md` before returning — if its notification is ever lost, recover from the file instead of re-dispatching blind.
+**Dispatch it and collect its result before 2b.** Dispatches are async by default (async-only at depth; a main-level `run_in_background: false` sync opt-in exists — field-notes §4) — the review child's completion arrives as a task-notification carrying its report, attached to your next tool result or re-waking you if you've ended your turn. The same holds for every dispatch in this loop — the 2a review agent, Lane 1/3 fixers, the Lane 2 Claude consult: collect each one's notification before acting on its lane. Belt-and-braces: the 2a review brief and the Lane 2 Claude-consult brief each make the child write its report to `RUN_DIR` (`round-<r>-report.md` / `round-<r>-consult.md`) before returning — if a notification is ever lost, recover from the file instead of re-dispatching blind.
 
 Spawn a sub-agent (`general-purpose`, `model: opus` per the model-selection policy) with this brief:
 
@@ -160,10 +160,11 @@ Stop *before* attempting fixes if any of these fire:
 
 Three lanes run this step. They are **serial**, not parallel — sequencing matters because the consult reasons about code state and a parallel FIX lane would rewrite it underneath. Within each lane, sub-agents are parallel where independent.
 
-#### Lane 1 — FIX (parallel sub-agents)
+#### Lane 1 — FIX (parallel sub-agents; inline for trivial rounds)
 
 Group `FIX` findings using judgment:
 
+- **Inline — no sub-agent** when the round's entire `FIX` bucket is low/nit one-liner fixes in files already in your context: apply them yourself, under the same rules as the brief below (minimal targeted edits; harder than expected → skip to `DEFER`; record file:line + before/after for the report), editing via absolute paths under `<WORKTREE>` — dispatch overhead would exceed the work (your global CLAUDE.md § Sub-agent delegation, "skip when"). Any finding above that bar → dispatch the whole batch per the rules below.
 - **Single sub-agent** for: small mechanical fixes across files (token-efficient), OR a cluster of related findings (one bug class, related lines).
 - **One sub-agent per file** when each file has substantive, independent fixes.
 - **Parallel sub-agents** for groups in different files — send concurrent Agent calls in a single message.
@@ -196,7 +197,7 @@ Run both reviewers concurrently: send a single message containing the Claude con
 
 `general-purpose`, `model: opus` per the model-selection policy. Brief:
 
-> You are giving a focused technical second opinion on decisions a code-review loop is about to make. You are **not** doing a fresh review — only weigh in on the listed items. **Read-only**: you're advising, not editing — never modify files or mutate git state; read the cited code and return recommendations only.
+> You are giving a focused technical second opinion on decisions a code-review loop is about to make. You are **not** doing a fresh review — only weigh in on the listed items. **Read-only**: you're advising, not editing — never modify files or mutate git state; read the cited code and return recommendations only — with one exception: before returning, write your complete response verbatim to `<RUN_DIR>/round-<r>-consult.md` (a scratchpad path outside the worktree; the loop's recovery channel if your completion notification is lost — field-notes §4), then return the same response as your result.
 >
 > Operate in `<WORKTREE>`: `cd <WORKTREE>` at the start of every Bash call (or absolute paths) — your cwd does not persist between calls, and the session-default cwd may be a different checkout whose version of the cited files differs.
 >
@@ -394,6 +395,7 @@ For each unfixed finding that is neither in `USER_PENDING` nor `DECIDED_TECH` (i
 - **Review command not recognized**: bail at step 0.
 - **Max rounds > 10**: bail at step 0.
 - **2a review agent lost** (killed, or its completion notification never arrived): Read `RUN_DIR/round-<r>-report.md` — the agent writes it before returning. File present → proceed to 2b on it. Absent → re-dispatch the round's review once and collect its notification (field-notes §4).
+- **Lane 2 Claude consult lost** (killed, or its completion notification never arrived): Read `RUN_DIR/round-<r>-consult.md` — the agent writes it before returning. File present → proceed to synthesis on it. Absent → re-dispatch the Claude consult once and collect its notification (field-notes §4).
 - **Pre-loop checkpoint commit fails** (hook rejection, committer identity unset): bail with the git error. (Ignored-only changes never reach it — porcelain lists nothing, the checkpoint is skipped, and the loop proceeds on the clean-tree scope path; gitignored work is out of scope by design.)
 - **All fix sub-agents skip everything in a round**: DEFER everything; next round detects steady state.
 - **Parallel sub-agents conflict on shared file** (shouldn't happen with proper grouping): revert that round's partial work, fall back to sequential within the round.

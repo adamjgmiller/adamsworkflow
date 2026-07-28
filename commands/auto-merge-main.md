@@ -264,7 +264,15 @@ The opinion leaf is a real `Agent` dispatch — inside the per-PR stage-agent th
 ```bash
 # Commit any straggler review/test-fix edits first — `git push` ships only commits,
 # and Step 3 bailed on dirty worktrees, so any dirt here is this run's own work.
-if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -m "fix: post-merge review/test fixes"; fi
+# READ the list before sweeping (this is the run's only push): "this run's own work"
+# also covers machine-local files the harness or a tool wrote mid-run, and a stray one
+# swept in here lands on the PR under a misleading message. Anything that is not
+# merge/conflict/review/test work gets named paths instead of `-A`.
+if [ -n "$(git status --porcelain)" ]; then
+  git status --porcelain                                   # inspect, then:
+  git add -A                                               # ...or `git add <paths>`
+  git commit -m "fix: post-merge review/test fixes"
+fi
 # Capture the merged-state SHAs for the plans record NOW — before the plans commit and the
 # push — so they name the merge+fixes state (Step 12's template uses these, not the post-push
 # COMMENT_* below, which would include the plans commit itself).
