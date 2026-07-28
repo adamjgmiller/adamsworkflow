@@ -59,6 +59,28 @@ what this repo actually ships.
   an escalation target; they are point-in-time records of runs that happened, not
   live instructions.
 
+## For the merge gate
+
+- **One public-footprint call.** `CLAUDE-global.md`'s model-selection paragraph now
+  carries the Opus 5 system-card numbers that motivated the change (§8 benchmark
+  spread, the price ratio, the AutomationBench classifier rates). All of it is public
+  information from Anthropic's own system card, and the repo's thesis — port the rule,
+  not the snapshot — argues for shipping a rule with its grounding rather than as a
+  bare assertion. But it is a pointed, dated set of claims on a public page, and
+  trimming it to "measured, not assumed" costs little. Left in; your call.
+- **Possible sixth log entry.** The README's improvement-loop section shows five log
+  entries. The 2026-07-23 recurrence — the same sub-agent stall class as the 2026-07-06
+  entry, but from the reversed harness behavior rather than orphaned notifications —
+  is the strongest available illustration that the loop keeps working. Not written:
+  those entries are curated from a real log, and authoring one would be inventing
+  history rather than porting it.
+
 ## Log
 
-- 2026-07-28 — branch opened; scope derived from the upstream diff; theme 1 ported.
+- 2026-07-28 — branch opened; scope derived from the upstream diff; six themes ported
+  across 23 files. Verification: leakage gate clean (Layer 1 + Layer 2, tracked tree +
+  branch messages + history); entity-grep verify on the changed tier name found no
+  unconverted carriers; vocabulary sweep for the superseded re-wake claim clean; all 13
+  field-notes sections present and every `field-notes §N` cite resolves; `install.sh`
+  passes `bash -n` and its dry-run touches nothing. No owner-specific terms in the
+  shipped suite (`plans/` history left as-is per D002).

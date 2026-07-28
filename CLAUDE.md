@@ -90,4 +90,4 @@ One row per installed, runnable artifact: what it hard-requires, how it degrades
 
 ## Provenance
 
-Generalized from a live, evolving personal config on 2026-07-18. The shipped copies were re-synced 2026-07-20 after a config-audit campaign on the live config (~150 validated fixes; this PR). The README explains the improvement loop — the "Config feedback" section at the top of `CLAUDE-global.md` — that keeps the origin this snapshot was taken from fresh.
+Generalized from a live, evolving personal config on 2026-07-18. The shipped copies were re-synced 2026-07-20 after a config-audit campaign on the live config (~150 validated fixes), and again on 2026-07-28 — that second pass carried the Opus 5 model-routing change, a reversed harness fact about backgrounded work at depth, and the sub-agent spawn-depth cap (see `plans/config-resync-2.md`). The README explains the improvement loop — the "Config feedback" section at the top of `CLAUDE-global.md` — that keeps the origin this snapshot was taken from fresh.
