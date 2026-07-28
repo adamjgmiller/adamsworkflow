@@ -254,11 +254,12 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
    memory), re-read the journal from disk before advancing. The cursor
    line is the source of truth, not your recollection.
 
-   **Branch first:** if HEAD is on the default branch, create/enter a
-   working branch (or worktree) before dispatching any mutating stage —
-   stage commits never land on main (your global CLAUDE.md's
-   never-commit-to-main rule; review-fix-loop Step 1 runs the same
-   preflight).
+   **Worktree first:** if HEAD is on the default branch, create and
+   enter a worktree on a working branch before dispatching any mutating
+   stage (your global CLAUDE.md § Worktrees: branch work stays out of the
+   main checkout; its exception covers work already sitting dirty in this
+   checkout — branch in place then) — stage commits never land on main
+   (the never-commit-to-main rule).
 
 2. **Decide on a build journal.** Create one at
    `<planning-dir>/<topic>-execution.md` — except when the plans/ layout is in

@@ -88,7 +88,7 @@ const knobs = (it) => it.intensity === 'meaningful'
 Notes:
 - **Codex per lens** runs *inside* an agent (workflow agents have Skill + Bash). If
   `codex` absent, run Opus-only and note it.
-- **Worktree-only scaffold — never touch the main checkout.** Create each
+- **Worktree-only scaffold — never touch the main checkout** (your global CLAUDE.md § Worktrees). Create each
   branch+worktree in a serial scaffold stage (not concurrently — avoids `.git` lock
   races): `git -C <repo> worktree add -b <branch> <repo>/.claude/worktrees/<slug>
   origin/main` (slug = branch with `/`→`-`; append `-2`/`-3` if the path exists;

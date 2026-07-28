@@ -52,7 +52,7 @@ Always delegate, the single-PR case included — the merge/review/test volume fo
 
 ## Step 3 — Worktree setup
 
-Same as `/pr-auto-review` Step 3 — find an existing worktree on the PR's branch and reuse it; else create one under `<repo>/.claude/worktrees/<slug>` per that step's snippet (fetch without checkout, flock-serialized `git worktree add`, `.env` symlink). Never check out the PR branch in the main checkout. Respect uncommitted work in an existing worktree.
+Same as `/pr-auto-review` Step 3 — find an existing worktree on the PR's branch and reuse it; else create one under `<repo>/.claude/worktrees/<slug>` per that step's snippet (fetch without checkout, flock-serialized `git worktree add`, `.env` symlink). Never check out the PR branch in the main checkout (your global CLAUDE.md § Worktrees). Respect uncommitted work in an existing worktree.
 
 For an existing worktree with uncommitted changes specifically for `/auto-merge-main`: this is **dangerous** — `git merge` won't run cleanly. Bail with a clear comment posted to the PR:
 

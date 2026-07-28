@@ -231,8 +231,13 @@ copied into `~/.claude/skills/` mid-session were invocable without a restart).
   travel in messages, truth lives in files/boards; senders stamp state, receivers
   re-check live artifacts, producers batch feedback then grep-verify before "done".
 
-## §11 zsh ties `path`↔`PATH` — never name a shell variable `path`
-Inline Bash-tool commands are eval'd under the user's shell (zsh here), and zsh links
+## §11 The Bash tool's shell is the user's shell — bash-only idioms fail silently
+Everything below was probed under **zsh 5.9**, the shell on the machine this suite runs
+on. If your login shell is bash these specific traps don't apply — but the general
+lesson does: inline Bash-tool commands are eval'd under *your* shell, not a guaranteed
+bash, and the failures below are all **silent** — no error, no fallback.
+
+**`path`↔`PATH` — never name a shell variable `path`.** zsh links
 the lowercase array `path` to `$PATH` (likewise `cdpath`, `fpath`, `manpath`,
 `mailpath`; `status` is read-only). Any assignment — `read -r path`, `for path in …`,
 `path=…` — silently rewrites the command search path; the symptom is
@@ -251,6 +256,36 @@ bash doesn't tie `path`↔`PATH`.
   independently re-verified same day in another session (`path=/tmp/nowhere;
   git --version` → exit 127; `wpath` control passes).
 
+**Unquoted `=`-prefixed words** are a separate trap in the same shell: zsh's `=cmd`
+filename expansion (EQUALS option, on by default) rewrites any unquoted argument
+beginning with `=` to the full path of the command named by the rest, and kills the
+whole line when none exists — `echo ===FOO===` → `zsh:1: ==FOO=== not found`, exit 1,
+`echo` never runs (probed 2026-07-23). Bites `===`-style sentinel/delimiter args;
+quote them (`echo "===FOO==="`).
+
+**Bash-only parameters and devices** read as empty or missing, so the check built on
+them silently becomes a no-op (all probed 2026-07-25):
+- `${PIPESTATUS[0]}` → **empty string**; zsh's equivalent is the lowercase, 1-indexed
+  `${pipestatus[1]}`. The natural spelling of the gate is the dangerous one: zsh's `[`
+  evaluates an empty operand as 0, so `… | tail -3; [ "${PIPESTATUS[0]}" -eq 0 ]` is
+  `0 -eq 0` → **true on a failing command** — it inverts the gate it exists to provide,
+  with no output. (Unquoted `[ ${PIPESTATUS[0]} -eq 0 ]` instead dies
+  `[:1: unknown condition: -eq` and fails closed; `= "0"` also fails closed. Only the
+  quoted numeric form silently passes — probed all three.) Portable fix:
+  `set -o pipefail; <cmd> 2>&1 | tail -N; echo EXIT=$?` — `pipefail` works in zsh
+  (`false | tail -1` → `$?` is 1 with it, 0 without).
+- `/dev/tcp/<host>/<port>` does **not exist** — bash synthesizes that device, zsh reads
+  it as a plain path. Every redirect fails `no such file or directory`, exit 1,
+  *whether or not anything is listening*, so a free-port probe written
+  `(echo > /dev/tcp/127.0.0.1/$p) || use_port $p` reports **every** port free and hands
+  back a port another process is already serving. Probe with
+  `ss -ltn "( sport = :$p )"` and test the **output** — `ss` exits 0 either way. Where
+  you control the listener, prefer binding port 0 and reading back the OS-assigned port
+  (what `scripts/make-it-easy/` does).
+- Same class, swept out of this suite on 2026-07-25 — assume broken if reintroduced:
+  `mapfile`/`readarray`, `declare -A`, `local -n`, `${var,,}`/`${var^^}`. Run a
+  genuinely wanted bashism under `bash -c '…'`.
+
 ## §12 Skill-tool arg substitution rewrites literal `$0` in the loaded text
 When the Skill tool loads a skill WITH invocation args, every literal `$0` in the
 SKILL.md text is substituted with the args string in the copy the agent reads — the file
@@ -268,3 +303,22 @@ and a guard sentence warning about this must itself avoid the literal token (spe
   reading the SKILL.md from disk. codex-consult carries the one-line guard beside that
   snippet; grep the suite for `field-notes §12` to enumerate carriers, and for any other
   Skill-loadable file with a literal `$0` in an operative recipe.
+
+## §13 Agent `model:` overrides are honored in BOTH directions — no harness tier cap
+The Agent tool's `model:` override resolves to exactly the tier named, including tiers
+ABOVE the dispatching session's model. There is no mechanical ceiling; the tier cap in
+`CLAUDE-global.md` § Sub-agent delegation is a deliberate policy, not an enforced limit.
+Unpinned calls inherit the session model exactly (including variant suffixes such as
+`[1m]`). Worth knowing before you port that policy: it is the *only* thing preventing
+silent escalation, so dropping it means dropping the guarantee, not inheriting one.
+- **Corollary — never verify a pin by asking the agent.** A subagent's self-reported
+  model identity is unreliable: it will sometimes name a different model and invent a
+  plausible-but-fake ID for it. The objective discriminator is the `subagent_tokens`
+  figure in the Agent tool result — system-prompt size clusters tightly by resolved
+  tier, and a misreporting child still sits in its true tier's band.
+- Provenance: probed 2026-07-25 from an Opus 5 session, 8 dispatches. A top-tier pin
+  resolved there both times (~35.29k tokens); unpinned → the session model (35.25k);
+  `model:'haiku'` → Haiku 4.5 (28.43k); `model:'sonnet'` → Sonnet 5 in 3 of 5, while
+  2 of 5 self-reported a *higher* tier under two DIFFERENT ids (one of them not a
+  published model id) — yet all five sat in the same 40.84k band, i.e. all five really
+  were Sonnet.

@@ -140,7 +140,7 @@ Hold `WORKTREE` as an absolute path and anchor **every** subsequent git/test com
 
 If the (reused) worktree has uncommitted changes, **respect them** — presumably the user's in-flight work. Record the dirty set in the decision log, then **stash it for the run, before the sync above** (`flock "${GIT_COMMON}/claude-stash.lock" git -C "$WORKTREE" stash push --include-untracked -m "pr-auto-review #<N>: user WIP"` — same flock-or-fallback convention as the worktree-add lock): reviewers' contextual reads, tests, and commits all want the clean PR state, and the fix loop's checkpoint would otherwise sweep the WIP into commits Step 12 pushes. Restore as the run's **last worktree act — immediately after Step 12 (so the outcome is known before the Step 14 comment), and on every earlier exit, including a Step 4 bail** — popping **this run's entry by its message**, with `--index` (preserves the staged/unstaged split), as **one atomic critical section under the same `claude-stash.lock`**: resolve `stash@{n}` by message from `git stash list` and pop it within a single locked command. The stash stack is shared across linked worktrees and indices shift whenever any concurrent per-PR agent pushes or pops — an unlocked lookup-then-pop can land on a sibling's entry even with the message check (a blind `git stash pop` is worse still). If the pop conflicts with the run's fixes, leave the stash in place and flag it in the Step 14 comment and Step 16 Notes — never force-resolve user work.
 
-Never check out the PR's branch in the main repo checkout.
+Never check out the PR's branch in the main repo checkout (your global CLAUDE.md § Worktrees).
 
 ## Step 4 — Idempotency check (skip if nothing has changed since the last run *started*)
 

@@ -259,10 +259,11 @@ promoting the PR; fix code or tests until green.
 ## Phases
 
 ### 0 — Size the docs (pick the tier first)
-**Branch first:** if HEAD is on the default branch, create/enter the feature branch (or
-worktree) now — every artifact below commits to it, and nothing in this pipeline ever
-commits to main (the global CLAUDE.md's never-commit-to-main rule; review-fix-loop Step 1
-runs the same preflight).
+**Worktree first:** if HEAD is on the default branch, create and enter the feature
+worktree now (the global CLAUDE.md § Worktrees: branch work stays out of the main
+checkout; its exception covers work already sitting dirty in this checkout — branch in
+place then) — every artifact below commits to the feature branch, and nothing in this
+pipeline ever commits to main (the never-commit-to-main rule).
 
 Pick the documentation tier before writing anything; record the choice + a one-line
 reason in the umbrella:
