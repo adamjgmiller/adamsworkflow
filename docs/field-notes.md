@@ -15,7 +15,10 @@ update it HERE, then grep the suite for the section cite to find affected files.
 ## §1 Fabric spawn capabilities
 - **Task fabric (Agent tool): dispatched sub-agents CAN spawn children** when their def
   doesn't restrict `tools:` (a `general-purpose` agent holds the Agent tool; `Explore`/
-  `Plan` types do not). This enables the stage-agent pattern: one delegated agent runs a
+  `Plan` types do not) **AND the §5 spawn-depth cap allows their depth** — since
+  v2.1.217 the default cap strips Agent from ALL unnamed sub-agents unless
+  `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set (§5 has the full mechanism). This
+  enables the stage-agent pattern: one delegated agent runs a
   whole stage and fans out its own leaves.
 - **Workflow fabric (`agent()` nodes): agents CANNOT spawn** — no Agent tool at all.
   Every fan-out on that fabric lives in the script (`parallel()`/`pipeline()`), never in
@@ -139,14 +142,40 @@ entries).
   Grep the suite for `field-notes §4` to enumerate carriers; any NEW fan-out brief must state
   the collect-before-join rule explicitly.
 
-## §5 Depth convention
-Keep nesting within ~3–4 levels. This is a self-imposed legibility/debuggability
-convention tighter than the harness's own limit — the harness documents a 5-level
-subagent depth cap (changelog v2.1.172/174; earlier probes found no wall because they
-never reached it). Counting: each Agent dispatch
-= +1; invoking a skill/command inline = +0 (it runs in the current agent's context); a
-detached CLI launch via Bash = +0. Sum across composed delegations; collapse a level
-when stacks run deep.
+## §5 Depth convention & the harness spawn-depth cap
+Keep nesting within ~3–4 levels — a self-imposed legibility/debuggability convention.
+Counting: each Agent dispatch = +1; invoking a skill/command inline = +0 (it runs in
+the current agent's context); a detached CLI launch via Bash = +0. Sum across composed
+delegations; collapse a level when stacks run deep.
+
+Harness cap (v2.1.217; probed live + binary-read 2026-07-22): an agent at depth d
+holds the Agent tool only while d < MAX; at or past MAX the tool is **stripped from
+its toolset** (absent from the tool list, ToolSearch can't load it — not a call-time
+refusal; a "Subagent nesting limit reached" error exists only as backstop). MAX
+resolves: env `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` if set → else a remote feature
+flag (integer floor 1, so remote config can deepen but never block main-loop spawns)
+→ else 1. **Default observed = 1: unnamed subagents cannot spawn at all** (probed:
+unnamed depth-1 agents toolless — sync, async, interactive, headless;
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=4` restores the tool, validated headless).
+Named teammates are the exception: the roster is flat, a teammate sits at depth 0,
+holds Agent, and spawns unnamed children (probed; those children are toolless);
+teammates cannot spawn teammates (hard error).
+
+**Adoption consequence — read this before running the suite.** Without the env var,
+every unnamed conductor in this suite silently degrades to inline work: the
+stage-runner pattern, `/orchestrate`'s per-stage dispatch, `/pr-auto-review`'s per-PR
+agents and their lens fan-out, `/ship-issues`' resolve agents. Nothing errors; the
+work just collapses into one context. Set
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=4` in your `~/.claude/settings.json` `env`
+block (4 covers the ~3–4 convention above). Settings `env` reaches NEW sessions only
+— restart after changing it. `install.sh` deliberately does not write this for you;
+it is your settings file to change.
+
+Supersedes the pre-2.1.217 "5-level documented cap" (v2.1.172/174) — and note the
+probe-hygiene trap that produced a false reading first time: `claude --version` reads
+the binary on disk, not the runtime of the session you are sitting in, so an
+in-session probe after an upgrade tests the OLD version. Probe through a fresh
+`claude -p` headless call.
 
 ## §6 Concurrency
 The ~16-concurrent figure is a Workflow-TOOL limit (min(16, cores−2) per workflow); it
@@ -162,6 +191,13 @@ cap unprobed; long autonomous flows (auto-run, big ship-issues batches, wide
 deep-research fan-outs) are the plausible approachers. Also a session-wide WebSearch
 cap, default 200 (`CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`) — relevant to wide
 deep-research fan-outs.
+
+Concurrently-RUNNING subagent cap (v2.1.217): default 20
+(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), confirmed by binary-read 2026-07-22; at the
+cap the spawn ERRORS ("Concurrent subagent limit reached… Do not retry") rather than
+queuing — binary-read, live-unprobed. A third distinct limit (concurrent, vs §5 depth
+and the session-total above). Wide unnamed fan-outs (20+ validators in one message)
+are the plausible approachers.
 
 ## §7 Playwright browser is a session-global singleton
 One shared tab across the main loop and every sub-agent (same MCP server). Two agents
@@ -183,6 +219,9 @@ is invisible to already-running sessions. The "Agent type not found" fallback (d
 `general-purpose` briefed to read the def as prose) inherits NONE of the def's
 frontmatter — both the `model:` pin and any `tools:` restriction are lost; restate both
 in the fallback brief (probed 2026-07-02).
+Scope: this session-start caveat covers agent defs ONLY. Skills and commands live-reload
+mid-session as of Claude Code v2.1.216 (changelog line; observed 2026-07-20 — skills
+copied into `~/.claude/skills/` mid-session were invocable without a restart).
 
 ## §10 Misc probed gotchas
 - `EnterWorktree` cannot create a worktree while the session is already in one (probed

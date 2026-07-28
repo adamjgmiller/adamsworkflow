@@ -346,6 +346,26 @@ cd adamsworkflow
 | `--copy` | each file copied — an independent baseline you fork and tweak |
 | `--dry-run` | pairs with either mode; prints every action, touches nothing |
 
+**One settings change the installer will not make for you.** Since Claude
+Code v2.1.217, an unnamed sub-agent holds no Agent tool by default — so it
+cannot spawn children. Most of this suite is built on sub-agents that fan
+out their own leaves (`stage-runner`, `/orchestrate`'s per-stage dispatch,
+`/pr-auto-review`'s per-PR agents and their lens fan-out,
+`/ship-issues`' resolve agents). Under the default, none of that errors; it
+silently collapses into one context, and you get a slower, shallower run
+that looks like the command simply under-delivered. Add to the `env` block
+of your `~/.claude/settings.json`, then restart (settings `env` reaches new
+sessions only):
+
+```json
+{ "env": { "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "4" } }
+```
+
+`install.sh` deliberately leaves your `settings.json` alone — it mirrors
+files and backs up what it replaces, nothing more. The mechanism, the probe,
+and the trap that produced a false reading first time are in
+[field-notes.md](./docs/field-notes.md) §5.
+
 Existing files are backed up to `<file>.bak-<timestamp>` before being
 replaced. Re-runs in symlink mode are idempotent — links already pointing
 into this clone are left alone. `CLAUDE_HOME` overrides only where
@@ -402,6 +422,9 @@ I just cloned this repo (adamsworkflow). Help me adapt and install it.
    gen-image exits with a message.
 5. Then install — ./install.sh --symlink or --copy, or a selective copy
    of just the pieces I chose — backing up anything you would replace.
+6. Show me the CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH setting from the
+   install section and let me decide on it; do not edit my settings.json
+   yourself. Tell me which of the pieces I chose depend on it.
 ```
 
 A clean-machine test of this prompt is part of this repo's pre-release

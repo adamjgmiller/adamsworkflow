@@ -23,7 +23,7 @@ A guide plus a config-share: the actual commands, skills, agent defs, scripts, a
 
 ## Dependency matrix
 
-One row per installed, runnable artifact: what it hard-requires, how it degrades when a requirement is absent, and adaptation notes. Reference documents that ship but neither install nor run — `CLAUDE-global.md` and `docs/config-change-reference.md` — are covered in Adaptation pointers instead. "Agent tool" means the ability to spawn sub-agents — present in top-level sessions and unrestricted agent defs, absent inside restricted defs and Workflow `agent()` nodes (`docs/field-notes.md` §1). "Codex CLI (soft)" marks a dependency behind a `command -v codex` preflight with a stated fallback; "(hard)" means the artifact stops without it.
+One row per installed, runnable artifact: what it hard-requires, how it degrades when a requirement is absent, and adaptation notes. Reference documents that ship but neither install nor run — `CLAUDE-global.md` and `docs/config-change-reference.md` — are covered in Adaptation pointers instead. "Agent tool" means the ability to spawn sub-agents — present in top-level sessions and unrestricted agent defs, absent inside restricted defs and Workflow `agent()` nodes (`docs/field-notes.md` §1). **Since Claude Code v2.1.217 it is also absent from every unnamed sub-agent by default**, which silently collapses every delegating command in the table below into single-context work; `docs/field-notes.md` §5 explains the cap and the one settings change that restores it. Read that before concluding an artifact under-delivers. "Codex CLI (soft)" marks a dependency behind a `command -v codex` preflight with a stated fallback; "(hard)" means the artifact stops without it.
 
 ### Commands
 
