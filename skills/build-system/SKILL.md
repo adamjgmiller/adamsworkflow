@@ -338,10 +338,11 @@ Autonomy-rule stop genuinely applies.
    already carries the bot's review for the current head — re-entrant runs must not
    double-trigger). Then poll the PR for its comments —
    as a background wait (a ~15-min poll exceeds the 10-min foreground Bash ceiling: use a
-   `run_in_background` until-loop checking ~every minute, up to ~15 minutes, and read its
-   captured output when it completes — never fire-and-forget; the completion notification
-   re-wakes you at any depth, main loop or sub-agent alike (field-notes §4, re-probed
-   2026-07-10)). If the window closes with nothing landed, note it and proceed — never
+   `run_in_background` until-loop checking ~every minute, up to ~15 minutes — never
+   fire-and-forget: its completion re-wakes the main loop but NOT a stopped sub-agent
+   (field-notes §4, re-probed 2026-07-23) — at depth read the loop's captured output
+   in bounded foreground checks and never stop with the wait pending). If the window
+   closes with nothing landed, note it and proceed — never
    block the pipeline on an external reviewer. For each substantive
    comment, decide whether to fix;
    fix, run the review loop on the fix, commit, push, and reply noting it's addressed.

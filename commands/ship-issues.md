@@ -360,7 +360,7 @@ Detect the project's test command:
 - `Makefile` with `test:` target → `make test`
 - `.tool-versions` or `mise.toml` hints → respect them
 
-If no test command is detectable → skip, note that no tests ran. Run the suite foreground when it fits the ~10-min Bash ceiling; background a longer run and await its completion notification — it re-wakes you with the output (field-notes §4); never proceed with the run pending. If tests fail, fix-loop up to **5 attempts** (brief: "fix these failing tests, minimal edits, do not weaken the assertions; never return with a test run still pending — hold each run's result before acting"). Exhaustion semantics are caller-specific: the resolve flow notes "tests failing after 5 fix attempts" and leaves the PR draft — CI is the final gate. (`/auto-merge-main` bails instead; its contract is "cleanly".)
+If no test command is detectable → skip, note that no tests ran. Run the suite foreground when it fits the ~10-min Bash ceiling; background a longer run and poll its output in bounded foreground checks (an `until`-loop reading the output file — backgrounded work does NOT re-wake you once you stop; field-notes §4); never stop or proceed with the run pending. If tests fail, fix-loop up to **5 attempts** (brief: "fix these failing tests, minimal edits, do not weaken the assertions; never return with a test run still pending — hold each run's result before acting"). Exhaustion semantics are caller-specific: the resolve flow notes "tests failing after 5 fix attempts" and leaves the PR draft — CI is the final gate. (`/auto-merge-main` bails instead; its contract is "cleanly".)
 
 ### H. Tough-decision protocol
 

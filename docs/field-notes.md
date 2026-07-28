@@ -85,15 +85,23 @@ entries).
 - **A dispatcher's own completion notification defers while it has live agent
   children** ("fires each time this agent stops with no live background children of its
   own") — a parent stopping with children pending doesn't falsely signal completion
-  upward. Backgrounded BASH tasks do NOT defer it (probed 2026-07-10).
-- **Backgrounded Bash at depth re-wakes too**: a stopped sub-agent is re-invoked when
-  its background Bash task exits, output in the notification (probed 2026-07-10;
-  supersedes the 2026-07-07 no-re-wake probe — long verifies at depth may be
-  backgrounded-and-awaited again). Foreground remains right for anything under the
-  ~10-min Bash ceiling; note the harness BLOCKS bare foreground `sleep` and chained
-  sleeps (use an `until <check>; do sleep 2; done` loop or a background task). Either
-  way, never return a bundle with a verify still pending — hold the pass/fail result
-  first.
+  upward. Backgrounded BASH tasks do NOT defer it (probed 2026-07-10; re-confirmed
+  2026-07-23).
+- **Backgrounded Bash at depth does NOT re-wake a stopped sub-agent** (probed
+  2026-07-23 on v2.1.218: child stopped with a sleep-40 background task pending; the
+  task exited; no re-invocation within ~2.5 min. Supersedes the 2026-07-10 re-wake
+  probe, which itself superseded a 2026-07-07 no-re-wake probe — VERSION-VOLATILE:
+  re-probe on upgrades). Same-day field grounding: 4 stalls in one `/ship-issues`
+  run — backgrounded test suites, Monitors, and timers all stranded stopped
+  sub-agents, while agent-child completion notifications delivered fine. The main
+  loop is unaffected — its backgrounded Bash still re-invokes it on exit. At depth:
+  foreground fits anything under the ~10-min Bash ceiling (bare and chained `sleep`
+  are BLOCKED — use an `until <check>; do sleep 2; done` loop); a longer run may be
+  backgrounded but must be POLLED — bounded foreground checks of its output file —
+  and a sub-agent must never stop or return with a run pending. A stalled child
+  resumes with full context via SendMessage to its agentId (works even after
+  TaskOutput reports "No task found"); the stall's tell is a completion notification
+  carrying "waiting for X" instead of its deliverable.
 - **Still no pull channel at depth**: sub-agents have no TaskOutput (ToolSearch finds
   none — re-confirmed 2026-07-10); the main loop does. Results reach sub-agents only
   via notifications (or inline, for a named teammate's sync dispatches). File handoff
@@ -126,8 +134,9 @@ entries).
 - Provenance: 2026-07-15 four-probe set on v2.1.210 (named-teammate sync dispatch +
   resume poke with token-carrying leaf; unnamed batched-pair concurrency; unnamed
   single dispatch; main-level sync flag), file-timestamped in the probe session's
-  scratchpad; 2026-07-10 set for the re-wake / deferral / TaskOutput facts. Grep the
-  suite for `field-notes §4` to enumerate carriers; any NEW fan-out brief must state
+  scratchpad; 2026-07-10 set for the deferral / TaskOutput facts; 2026-07-23 probe
+  (v2.1.218) + same-day `/ship-issues` field stalls for the no-re-wake-at-depth fact.
+  Grep the suite for `field-notes §4` to enumerate carriers; any NEW fan-out brief must state
   the collect-before-join rule explicitly.
 
 ## §5 Depth convention
