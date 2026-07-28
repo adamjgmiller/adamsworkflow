@@ -88,7 +88,7 @@ const knobs = (it) => it.intensity === 'meaningful'
 Notes:
 - **Codex per lens** runs *inside* an agent (workflow agents have Skill + Bash). If
   `codex` absent, run Opus-only and note it.
-- **Worktree-only scaffold — never touch the main checkout.** Create each
+- **Worktree-only scaffold — never touch the main checkout** (your global CLAUDE.md § Worktrees). Create each
   branch+worktree in a serial scaffold stage (not concurrently — avoids `.git` lock
   races): `git -C <repo> worktree add -b <branch> <repo>/.claude/worktrees/<slug>
   origin/main` (slug = branch with `/`→`-`; append `-2`/`-3` if the path exists;
@@ -126,8 +126,8 @@ Notes:
   · `SETUP{ok,branch,worktree,error}` · `FIX{ok,fixed_count,pushed,notes}` ·
   `FINALIZE{promoted,tests,comment_url}`.
 - **Dual-source per lens = a paired leaf**: `parallel(opusLeaf, codexLeaf)` (per-lens
-  model per the model-selection policy for `opusLeaf` — Opus default, Fable only for a
-  lens passing the policy's escalation test; `codexLeaf` is a Codex-driver →
+  model per the model-selection policy for `opusLeaf` — Opus; a purely mechanical lens
+  may drop to Sonnet, never escalate above Opus; `codexLeaf` is a Codex-driver →
   `model: 'sonnet'`). **Brief the `opusLeaf` (and every review-stage lens agent)
   read-only on the tree** — workflow agents hold Edit/Write, so a lens agent must be
   told it reviews and returns findings only: never edit/create/delete files, mutate

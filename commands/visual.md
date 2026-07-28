@@ -16,7 +16,7 @@ Thin wrapper over the **Communication visuals** rule in your global CLAUDE.md (s
 
 2. **Write a payload-complete brief** (inline, or a handoff file the brief points to): the full content payload, the audience takeaway, the section shape you want, and the output path (scratchpad unless it belongs somewhere specific). "Read X and figure it out" is where delegation fidelity dies — don't.
 
-3. **Dispatch `visual-builder`** (Agent tool, `subagent_type: visual-builder`) with the brief, passing `model:` explicitly per the Communication visuals tiering — Opus normally · Sonnet when genuinely simple · Fable only when the material is complex AND a subtle misstatement is costly — never above the session tier; my explicit override wins in either direction.
+3. **Dispatch `visual-builder`** (Agent tool, `subagent_type: visual-builder`) with the brief, passing `model:` explicitly per the Communication visuals tiering — Opus normally · Sonnet when genuinely simple; never escalate above Opus on your own judgment, and my explicit override wins in either direction.
 
 4. **Spot-check** the returned page's load-bearing claims against the brief (the known failure mode is plausible misattribution, not bad design). Surface its TBD markers to me rather than papering over them.
 

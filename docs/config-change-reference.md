@@ -19,13 +19,21 @@ chase down every carrier before the config quietly starts lying.
 | Role | What it does in the procedure | The owner's instance (worked example) |
 |---|---|---|
 | **Canonical fact store** | The single home where a given fact is stated with provenance; everything else cites it | Split by kind: probed harness facts → `~/.claude/docs/field-notes.md`; standing policy → the global `~/.claude/CLAUDE.md`; Codex CLI mechanics → `codex-consult/SKILL.md`; a command's or agent-def's own contract → that file itself |
-| **Carrier inventory + two-grep sweep** | The full set of files that *repeat* a fact, and the sweep that finds every one — grepping the section **cite** and, separately, the old fact's **vocabulary** | The whole config tree (`~/.claude/`: commands, skills, agents, workflows, docs, root CLAUDE.md), plus the standard/tenets doc, the probe-recipes doc, the review/suppression notes, and the routing page |
+| **Carrier inventory + the grep sweep** | The full set of files that *repeat* a fact, and the sweep that finds every one — grepping the section **cite**, the old fact's **vocabulary**, and (when a named thing changed) the entity's **name** as a post-save verify | The whole config tree (`~/.claude/`: commands, skills, agents, workflows, docs, root CLAUDE.md), plus the standard/tenets doc, the probe-recipes doc, the review/suppression notes, and the routing page |
 | **Persistence / sync mechanism** | Gets a saved edit committed and mirrored across machines; different path classes need different handling | A dotfiles manager — chezmoi — with a per-path-class handling matrix (reproduced as a worked example in step 3) |
 | **Routing documentation** | The human-facing doc/page that indexes *how work is routed* through the config; goes stale by omission | A "when to use which" routing page — an HTML index of vehicles, review tiers, and policies |
 | **Audit log + changelog cursor** | A running record of every config change, plus a "last reviewed: vX" line that is the changelog-review trigger's comparand | A LOG file whose entries carry date / change / grounding, and a `Last reviewed: vX` line kept current in the same place |
 
 The rest of this file is the procedure. Where a step says "the canonical home" or "the
 routing page," substitute your own instance from the table.
+
+**Scope.** This procedure is for *user-level* agent config — the suite that governs how
+your agent works everywhere. A project repo's own `CLAUDE.md`, `.claude/` directory, or
+plan docs are ordinary repo edits and go through that project's normal PR flow; none of
+the ceremony below applies to them. (Grounded 2026-07-22: a project-repo `CLAUDE.md` fix
+was routed into this procedure because the scope line then said only "CLAUDE.mds" —
+routing reads the shortest description available, so an exclusion has to be stated where
+routing looks, not only in the body.)
 
 ## 0. External feedback? Validate before applying
 
@@ -44,7 +52,7 @@ command's or def's own contract → that file. Update the home *with provenance*
 was probed or observed, and when. Every other carrier then states the fact in one line
 plus a cite back to the home, never re-derives it.
 
-## 2. Carrier sweep — cite-grep AND vocabulary-grep
+## 2. Carrier sweep — cite-grep, vocabulary-grep, entity-grep
 
 Grep the suite twice. First for the section **cite** (e.g. `field-notes §4`). Then,
 separately, for the **vocabulary the old fact used** (e.g. `foreground`, `silently
@@ -60,6 +68,19 @@ Grep roots, by role: the whole config tree (commands, skills, agents, workflows,
 root CLAUDE.md); the standard/tenets doc; the probe-recipes doc; the review/suppression
 notes (suppression rationales quote live facts); and the routing page — the
 omission-prone carrier.
+
+**Third pass — entity-grep minus known-good, when the change redefines or removes a
+NAMED thing** (a model tier, tool, agent type, command, flag, endpoint). One rule gets
+phrased many ways with no shared n-gram, so the old phrasings cannot be enumerated up
+front — but every carrier contains the entity's literal name. Bare-name grep is too
+noisy alone (most hits are correct, including what you just wrote), so subtract:
+`grep -rnioE ".{50}\bNAME\b.{70}" <roots> | grep -viE "<phrases you just authored>"`
+— the residue is the unconverted carriers. **This is a VERIFY pass: run it AFTER step 3
+saves**, since the subtraction list is the new wording; it doubles as the "am I done?"
+check the two discovery passes cannot give. An over-broad `-v` hides carriers — filter
+only on phrases you literally wrote this session, and sanity-check how much it removed.
+(Grounded 2026-07-25: removing an agent-selectable model tier — cite-grep and
+vocabulary-grep between them missed 3 carriers, and this pass then caught 2 more.)
 
 ## 3. Save under the persistence-mechanism rules (finalize wording BEFORE saving)
 
@@ -102,9 +123,9 @@ already running — it takes effect only in a fresh session (field-notes §9).
 
 Run this when the installed version has moved past the last-reviewed one. The
 comparand is a `Last reviewed: vX` cursor line kept in the audit log — as a worked
-example, the owner's currently reads `Last reviewed: v2.1.214` (recorded in the LOG on
-2026-07-19; prior runs on 2026-07-10 and 2026-07-15). Update that line as part of
-every run.
+example, the owner's currently reads `Last reviewed: v2.1.220` (recorded in the LOG on
+2026-07-25; prior runs 2026-07-10 through 2026-07-23, roughly one per upgrade). Update
+that line as part of every run.
 
 1. Diff the changelog over the un-reviewed range; pull every suite-adjacent line
    (subagents, dispatch, tools, worktrees, hooks, skills/commands parsing).
@@ -112,5 +133,12 @@ every run.
    invalidate a documented fact? Probe what is cheap and load-bearing; label the rest
    as watch items tagged with the version number — an unverified changelog line never
    rewrites a probed fact.
+   **Probe hygiene — probe the NEW runtime, not your own session:** the session whose
+   trigger fired is usually still RUNNING the old binary (`claude --version` reads the
+   disk, not the process), so in-session Agent-tool probes exercise the old version.
+   Run live probes through a fresh `claude -p` headless call, or confirm the probing
+   session's runtime via its transcript's `version` fields first (grounded 2026-07-22:
+   a nesting probe for a just-installed version ran on the previous runtime and
+   recorded a false negative; corrected the same day).
 3. Apply any real fact change via steps 1–5 above; record the review (range covered,
    changes made, watch items opened) in the LOG so the next run knows where to start.

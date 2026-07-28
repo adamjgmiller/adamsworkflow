@@ -177,9 +177,8 @@ dispatch one named **`stage-runner`** agent per phase (`subagent_type: "stage-ru
 its definition at `~/.claude/agents/stage-runner.md` carries the full contract — on
 "Agent type not found", a stale session registry, dispatch `general-purpose` briefed to
 read and follow that file). Pass an explicit `model:` on every stage-runner dispatch —
-default `opus` (conductor), `fable` only when a child of that phase may warrant Fable per
-the policy's escalation test (per-phase call); unpinned dispatches inherit the session model (auto-Fable on a Fable
-session). Brief it with the artifact, the lenses/angles, a convergence
+`opus` (conductor; Fable only if the user named it) — unpinned dispatches inherit the
+session model (auto-Fable on a Fable session). Brief it with the artifact, the lenses/angles, a convergence
 budget, **the repo root/worktree** (every git command and the verify run from there —
 `cd` at the start of each Bash call or `git -C`; sub-agent cwd does not persist between
 calls), the repo's commit convention (commit fixes per round; **never push**), and the
@@ -260,10 +259,11 @@ promoting the PR; fix code or tests until green.
 ## Phases
 
 ### 0 — Size the docs (pick the tier first)
-**Branch first:** if HEAD is on the default branch, create/enter the feature branch (or
-worktree) now — every artifact below commits to it, and nothing in this pipeline ever
-commits to main (the global CLAUDE.md's never-commit-to-main rule; review-fix-loop Step 1
-runs the same preflight).
+**Worktree first:** if HEAD is on the default branch, create and enter the feature
+worktree now (the global CLAUDE.md § Worktrees: branch work stays out of the main
+checkout; its exception covers work already sitting dirty in this checkout — branch in
+place then) — every artifact below commits to the feature branch, and nothing in this
+pipeline ever commits to main (the never-commit-to-main rule).
 
 Pick the documentation tier before writing anything; record the choice + a one-line
 reason in the umbrella:
@@ -339,10 +339,11 @@ Autonomy-rule stop genuinely applies.
    already carries the bot's review for the current head — re-entrant runs must not
    double-trigger). Then poll the PR for its comments —
    as a background wait (a ~15-min poll exceeds the 10-min foreground Bash ceiling: use a
-   `run_in_background` until-loop checking ~every minute, up to ~15 minutes, and read its
-   captured output when it completes — never fire-and-forget; the completion notification
-   re-wakes you at any depth, main loop or sub-agent alike (field-notes §4, re-probed
-   2026-07-10)). If the window closes with nothing landed, note it and proceed — never
+   `run_in_background` until-loop checking ~every minute, up to ~15 minutes — never
+   fire-and-forget: its completion re-wakes the main loop but NOT a stopped sub-agent
+   (field-notes §4, re-probed 2026-07-23) — at depth read the loop's captured output
+   in bounded foreground checks and never stop with the wait pending). If the window
+   closes with nothing landed, note it and proceed — never
    block the pipeline on an external reviewer. For each substantive
    comment, decide whether to fix;
    fix, run the review loop on the fix, commit, push, and reply noting it's addressed.

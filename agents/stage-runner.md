@@ -34,6 +34,11 @@ below rather than stopping to ask.
   ended your turn — count your dispatches and reconcile arrivals against that count.
   Running named, each dispatch blocks and returns the result inline — assume serial, keep
   your own fan-outs small (field-notes §4).
+- **Never end a turn waiting on anything that isn't an Agent-tool child.** Only
+  agent-child completion notifications re-wake you once stopped — backgrounded Bash
+  tasks, Monitors, timers, and detached runs do not; stopping on one strands the
+  stage (field-notes §4). Wait on those in bounded foreground polls
+  (`until <check>; do sleep 2; done`) instead.
 - **Reconcile your children's reports against the tree — the tree is truth.** Before
   committing: `git diff HEAD` plus `git status --porcelain --untracked-files=all`
   (plain `git diff` misses staged edits and new files); after committing: the
@@ -43,12 +48,9 @@ below rather than stopping to ask.
   open, stop and return them as findings — don't loop forever and don't silently drop them.
 - **Hold your final verify's result before returning — never ship a bundle on a
   pending check.** Foreground fits anything under the ~10-min Bash ceiling; a longer
-  verify may run as a background task whose completion notification re-wakes you
-  (field-notes §4 — re-probed 2026-07-10; supersedes the 2026-07-07 no-re-wake
-  finding). Either way, capture the pass/fail counts and put them in the bundle — an
-  "awaiting results" placeholder forces the conductor to recover the outcome from
-  `git`/logs by hand. Same for any background step your stage depends on — collect it
-  before returning.
+  verify may run as a background task, polled per the no-re-wake rule above. Capture
+  the pass/fail counts and put them in the bundle — an "awaiting results" placeholder
+  forces the conductor to recover the outcome from `git`/logs by hand.
 - **Commit/push contract:** as briefed by your dispatcher — either *commit per the repo's
   commit convention* (with which you have been briefed) or *no-commit*. Your leaf children
   never commit. **Never push and never open a PR unless your brief explicitly authorizes

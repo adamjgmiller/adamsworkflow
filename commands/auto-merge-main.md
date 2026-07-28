@@ -45,14 +45,14 @@ Soft blockers:
 
 Always delegate, the single-PR case included — the merge/review/test volume for even one PR (conflict reading, `/review-fix-loop` rounds, test output) shouldn't land in this dispatching context for a ~20-line deliverable. The N=1 path is the N>1 path with one agent.
 
-- **For each PR (1..N)** → spawn one `general-purpose` stage-agent — dispatch with an explicit `model:`: default `opus` (conductor); escalate a given PR's agent to `fable` only when it passes the policy's escalation test (per-PR call); never leave it to inheritance (an unpinned dispatch inherits the session model): *"Follow `~/.claude/commands/auto-merge-main.md` Steps 3–14 for PR #N (BASE_BRANCH=`<value>`). Every child you spawn (the 7b resolver, Step 10 consult leaves, the review loop's sub-agents) dispatches async — its result arrives as a task-notification that re-wakes you if you've stopped; collect every child's notification before advancing (field-notes §4). You own the irreversible tail — the merge-main-into-branch commit, the push to the PR's own head ref, the PR comment — execute those yourself; never sub-delegate them to your own children. If you hit **any** bail condition in the Hard rules list (that list is authoritative — every condition in it, not a subset), execute its bail exactly as written (abort/comment) and report it in your per-item block; never improvise past a bail, never swallow one. Return the per-item report block (Step 13)."*
+- **For each PR (1..N)** → spawn one `general-purpose` stage-agent — dispatch with an explicit `model:`: `opus` (conductor — Fable only if the user named it); never leave it to inheritance (an unpinned dispatch inherits the session model): *"Follow `~/.claude/commands/auto-merge-main.md` Steps 3–14 for PR #N (BASE_BRANCH=`<value>`). Every child you spawn (the 7b resolver, Step 10 consult leaves, the review loop's sub-agents) dispatches async — its result arrives as a task-notification that re-wakes you if you've stopped; collect every child's notification before advancing (field-notes §4). You own the irreversible tail — the merge-main-into-branch commit, the push to the PR's own head ref, the PR comment — execute those yourself; never sub-delegate them to your own children. If you hit **any** bail condition in the Hard rules list (that list is authoritative — every condition in it, not a subset), execute its bail exactly as written (abort/comment) and report it in your per-item block; never improvise past a bail, never swallow one. Return the per-item report block (Step 13)."*
 - **Cap: at most 4 per-PR stage-agents in flight**; start the next as one returns. (If 4 proves tight in practice, drop to 3.) The cap is not optional: each stage-agent fans out children of its own (the review loop's 2a review sub-agent, Step 10 consult children, the Step 7b resolver), so the real concurrent-agent number is PRs-in-flight × within-PR children (`~/.claude/docs/field-notes.md` §6). Stay under it.
 - Collect all blocks. For each `merged + pushed` block, spot-verify the report against the remote: `gh pr view <N> --json headRefOid` should start with the block's branch SHA — the block describes intent, the ref is truth. On a prefix mismatch, don't fail the block outright — `git fetch origin <pr-branch>` and check `git merge-base --is-ancestor <reported-sha> <headRefOid>`: if the reported SHA is an ancestor of the current head, the merge landed and someone pushed after it (accept; note the trailing push); only a SHA unreachable from the head means the merge didn't land.
 - No `Agent` tool in your own toolset (e.g. this file reached via a Workflow agent's Skill tool)? **Bail before any side effect** with a clear error: this command requires the Task fabric — re-run it from the main loop or a spawn-capable stage-agent. There is no degraded inline mode (capability is detected, never assumed; the resolver, review loop, and consult machinery all presume spawning).
 
 ## Step 3 — Worktree setup
 
-Same as `/pr-auto-review` Step 3 — find an existing worktree on the PR's branch and reuse it; else create one under `<repo>/.claude/worktrees/<slug>` per that step's snippet (fetch without checkout, flock-serialized `git worktree add`, `.env` symlink). Never check out the PR branch in the main checkout. Respect uncommitted work in an existing worktree.
+Same as `/pr-auto-review` Step 3 — find an existing worktree on the PR's branch and reuse it; else create one under `<repo>/.claude/worktrees/<slug>` per that step's snippet (fetch without checkout, flock-serialized `git worktree add`, `.env` symlink). Never check out the PR branch in the main checkout (your global CLAUDE.md § Worktrees). Respect uncommitted work in an existing worktree.
 
 For an existing worktree with uncommitted changes specifically for `/auto-merge-main`: this is **dangerous** — `git merge` won't run cleanly. Bail with a clear comment posted to the PR:
 
@@ -178,7 +178,7 @@ Proceed to Step 8.
 
 ### 7b. Merge with conflicts — one resolver agent for the whole merge
 
-`git status` shows conflicted files. Don't grind through them in your own context (the both-sides-plus-base reading is exactly the volume delegation exists for), and **never fan out per-file resolver children** — resolutions in one file often inform another, and parallel children restaging a conflicted index is a footgun. Dispatch **one** `general-purpose` resolver sub-agent **per merge** — with an explicit `model:`: default `opus` (it's a conductor that runs Step 10 consults), `fable` only per the policy's escalation test; never leave it to inheritance — serial within itself, and touch nothing in the worktree while it runs.
+`git status` shows conflicted files. Don't grind through them in your own context (the both-sides-plus-base reading is exactly the volume delegation exists for), and **never fan out per-file resolver children** — resolutions in one file often inform another, and parallel children restaging a conflicted index is a footgun. Dispatch **one** `general-purpose` resolver sub-agent **per merge** — with an explicit `model:`: `opus` (it's a conductor that runs Step 10 consults; Fable only if the user named it); never leave it to inheritance — serial within itself, and touch nothing in the worktree while it runs.
 
 **Merge-conflict-resolver brief** — this inline brief is the canonical contract (single consumer; cite this section if ever needed elsewhere, don't create a named def). Dispatch with the worktree path and Step 6's recorded analysis pasted in:
 
@@ -237,7 +237,7 @@ If the loop hits regression (its 2c stop: 'newly introduced' exceeding last roun
 
 ## Step 9 — Detect + run tests (loop fix up to 5 attempts)
 
-Detect the project's test command (`package.json` → `npm test`/`pnpm test`/`yarn test` per lockfile; `pyproject.toml` with pytest config → `pytest`; `Cargo.toml` → `cargo test`; `go.mod` → `go test ./...`; `Makefile` with `test:` target → `make test`; respect `.tool-versions`/`mise.toml` hints). If no test command is detectable → skip, note that no tests ran. Run the suite foreground when it fits the ~10-min Bash ceiling; background a longer run and await its completion notification — it re-wakes you with the output (field-notes §4); never proceed with the run pending.
+Detect the project's test command (`package.json` → `npm test`/`pnpm test`/`yarn test` per lockfile; `pyproject.toml` with pytest config → `pytest`; `Cargo.toml` → `cargo test`; `go.mod` → `go test ./...`; `Makefile` with `test:` target → `make test`; respect `.tool-versions`/`mise.toml` hints). If no test command is detectable → skip, note that no tests ran. Run the suite foreground when it fits the ~10-min Bash ceiling; background a longer run and poll its output in bounded foreground checks (an `until`-loop reading the output file — backgrounded work does NOT re-wake you once you stop; field-notes §4); never stop or proceed with the run pending.
 
 If tests fail post-merge, fix-loop up to 5 attempts (sub-agent brief: "All commands run from `<worktree>` — `cd <worktree>` at the start of every Bash call; your cwd does not persist between calls. Fix these failing tests, minimal edits, do not weaken the assertions; never return with a test run still pending — hold each run's result before acting (field-notes §4)"). After 5: **bail** — restore the worktree first (`git reset --hard "$PRE_MERGE_HEAD"` — discards this run's own unpushed merge + test-fix commits; the Hard-rules carve-out — then `git clean -fd`: untracked leftovers from a failed attempt survive a hard reset, and Step 3 guaranteed a clean tree at run start, so anything untracked now is this run's own), then comment `Outcome: failed — tests broken after merge, 5 fix attempts didn't recover. <test-output-summary>`. Don't push test-broken state.
 
@@ -248,7 +248,7 @@ If tests fail post-merge, fix-loop up to 5 attempts (sub-agent brief: "All comma
 Anywhere the agent faces a judgment call it would have stopped to ask about:
 
 1. Frame the decision.
-2. Fan out an opinion leaf (`model: opus`/`fable` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel — collect both leaves' completion task-notifications before synthesizing (async dispatch; field-notes §4).
+2. Fan out an opinion leaf (`model: opus` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel — collect both leaves' completion task-notifications before synthesizing (async dispatch; field-notes §4).
 3. Synthesize with `review-fix-loop.md` Lane 2's **unattended variant** (the canonical statement of the extended chain: reversibility → behavior preservation → blast radius → higher confidence → least action → first option in the framing — logging which terminal rule fired).
 4. Log in `plans/<branch>.md` Decisions section; surface meaningful ones in the PR comment.
 5. Proceed.
@@ -264,7 +264,15 @@ The opinion leaf is a real `Agent` dispatch — inside the per-PR stage-agent th
 ```bash
 # Commit any straggler review/test-fix edits first — `git push` ships only commits,
 # and Step 3 bailed on dirty worktrees, so any dirt here is this run's own work.
-if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -m "fix: post-merge review/test fixes"; fi
+# READ the list before sweeping (this is the run's only push): "this run's own work"
+# also covers machine-local files the harness or a tool wrote mid-run, and a stray one
+# swept in here lands on the PR under a misleading message. Anything that is not
+# merge/conflict/review/test work gets named paths instead of `-A`.
+if [ -n "$(git status --porcelain)" ]; then
+  git status --porcelain                                   # inspect, then:
+  git add -A                                               # ...or `git add <paths>`
+  git commit -m "fix: post-merge review/test fixes"
+fi
 # Capture the merged-state SHAs for the plans record NOW — before the plans commit and the
 # push — so they name the merge+fixes state (Step 12's template uses these, not the post-push
 # COMMENT_* below, which would include the plans commit itself).

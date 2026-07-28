@@ -15,7 +15,10 @@ update it HERE, then grep the suite for the section cite to find affected files.
 ## §1 Fabric spawn capabilities
 - **Task fabric (Agent tool): dispatched sub-agents CAN spawn children** when their def
   doesn't restrict `tools:` (a `general-purpose` agent holds the Agent tool; `Explore`/
-  `Plan` types do not). This enables the stage-agent pattern: one delegated agent runs a
+  `Plan` types do not) **AND the §5 spawn-depth cap allows their depth** — since
+  v2.1.217 the default cap strips Agent from ALL unnamed sub-agents unless
+  `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is set (§5 has the full mechanism). This
+  enables the stage-agent pattern: one delegated agent runs a
   whole stage and fans out its own leaves.
 - **Workflow fabric (`agent()` nodes): agents CANNOT spawn** — no Agent tool at all.
   Every fan-out on that fabric lives in the script (`parallel()`/`pipeline()`), never in
@@ -85,15 +88,23 @@ entries).
 - **A dispatcher's own completion notification defers while it has live agent
   children** ("fires each time this agent stops with no live background children of its
   own") — a parent stopping with children pending doesn't falsely signal completion
-  upward. Backgrounded BASH tasks do NOT defer it (probed 2026-07-10).
-- **Backgrounded Bash at depth re-wakes too**: a stopped sub-agent is re-invoked when
-  its background Bash task exits, output in the notification (probed 2026-07-10;
-  supersedes the 2026-07-07 no-re-wake probe — long verifies at depth may be
-  backgrounded-and-awaited again). Foreground remains right for anything under the
-  ~10-min Bash ceiling; note the harness BLOCKS bare foreground `sleep` and chained
-  sleeps (use an `until <check>; do sleep 2; done` loop or a background task). Either
-  way, never return a bundle with a verify still pending — hold the pass/fail result
-  first.
+  upward. Backgrounded BASH tasks do NOT defer it (probed 2026-07-10; re-confirmed
+  2026-07-23).
+- **Backgrounded Bash at depth does NOT re-wake a stopped sub-agent** (probed
+  2026-07-23 on v2.1.218: child stopped with a sleep-40 background task pending; the
+  task exited; no re-invocation within ~2.5 min. Supersedes the 2026-07-10 re-wake
+  probe, which itself superseded a 2026-07-07 no-re-wake probe — VERSION-VOLATILE:
+  re-probe on upgrades). Same-day field grounding: 4 stalls in one `/ship-issues`
+  run — backgrounded test suites, Monitors, and timers all stranded stopped
+  sub-agents, while agent-child completion notifications delivered fine. The main
+  loop is unaffected — its backgrounded Bash still re-invokes it on exit. At depth:
+  foreground fits anything under the ~10-min Bash ceiling (bare and chained `sleep`
+  are BLOCKED — use an `until <check>; do sleep 2; done` loop); a longer run may be
+  backgrounded but must be POLLED — bounded foreground checks of its output file —
+  and a sub-agent must never stop or return with a run pending. A stalled child
+  resumes with full context via SendMessage to its agentId (works even after
+  TaskOutput reports "No task found"); the stall's tell is a completion notification
+  carrying "waiting for X" instead of its deliverable.
 - **Still no pull channel at depth**: sub-agents have no TaskOutput (ToolSearch finds
   none — re-confirmed 2026-07-10); the main loop does. Results reach sub-agents only
   via notifications (or inline, for a named teammate's sync dispatches). File handoff
@@ -126,18 +137,45 @@ entries).
 - Provenance: 2026-07-15 four-probe set on v2.1.210 (named-teammate sync dispatch +
   resume poke with token-carrying leaf; unnamed batched-pair concurrency; unnamed
   single dispatch; main-level sync flag), file-timestamped in the probe session's
-  scratchpad; 2026-07-10 set for the re-wake / deferral / TaskOutput facts. Grep the
-  suite for `field-notes §4` to enumerate carriers; any NEW fan-out brief must state
+  scratchpad; 2026-07-10 set for the deferral / TaskOutput facts; 2026-07-23 probe
+  (v2.1.218) + same-day `/ship-issues` field stalls for the no-re-wake-at-depth fact.
+  Grep the suite for `field-notes §4` to enumerate carriers; any NEW fan-out brief must state
   the collect-before-join rule explicitly.
 
-## §5 Depth convention
-Keep nesting within ~3–4 levels. This is a self-imposed legibility/debuggability
-convention tighter than the harness's own limit — the harness documents a 5-level
-subagent depth cap (changelog v2.1.172/174; earlier probes found no wall because they
-never reached it). Counting: each Agent dispatch
-= +1; invoking a skill/command inline = +0 (it runs in the current agent's context); a
-detached CLI launch via Bash = +0. Sum across composed delegations; collapse a level
-when stacks run deep.
+## §5 Depth convention & the harness spawn-depth cap
+Keep nesting within ~3–4 levels — a self-imposed legibility/debuggability convention.
+Counting: each Agent dispatch = +1; invoking a skill/command inline = +0 (it runs in
+the current agent's context); a detached CLI launch via Bash = +0. Sum across composed
+delegations; collapse a level when stacks run deep.
+
+Harness cap (v2.1.217; probed live + binary-read 2026-07-22): an agent at depth d
+holds the Agent tool only while d < MAX; at or past MAX the tool is **stripped from
+its toolset** (absent from the tool list, ToolSearch can't load it — not a call-time
+refusal; a "Subagent nesting limit reached" error exists only as backstop). MAX
+resolves: env `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` if set → else a remote feature
+flag (integer floor 1, so remote config can deepen but never block main-loop spawns)
+→ else 1. **Default observed = 1: unnamed subagents cannot spawn at all** (probed:
+unnamed depth-1 agents toolless — sync, async, interactive, headless;
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=4` restores the tool, validated headless).
+Named teammates are the exception: the roster is flat, a teammate sits at depth 0,
+holds Agent, and spawns unnamed children (probed; those children are toolless);
+teammates cannot spawn teammates (hard error).
+
+**Adoption consequence — read this before running the suite.** Without the env var,
+every unnamed conductor in this suite silently degrades to inline work: the
+stage-runner pattern, `/orchestrate`'s per-stage dispatch, `/pr-auto-review`'s per-PR
+agents and their lens fan-out, `/ship-issues`' resolve agents. Nothing errors; the
+work just collapses into one context. Set
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=4` in your `~/.claude/settings.json` `env`
+block (4 covers the ~3–4 convention above). Settings `env` reaches NEW sessions only
+— restart after changing it. `install.sh` deliberately does not write this for you;
+it is your settings file to change.
+
+Supersedes the pre-2.1.217 "5-level documented cap" (v2.1.172/174) — and note the
+probe-hygiene trap that produced a false reading first time: `claude --version` reads
+the binary on disk, not the runtime of the session you are sitting in, so an
+in-session probe after an upgrade tests the OLD version. Probe through a fresh
+`claude -p` headless call.
 
 ## §6 Concurrency
 The ~16-concurrent figure is a Workflow-TOOL limit (min(16, cores−2) per workflow); it
@@ -153,6 +191,13 @@ cap unprobed; long autonomous flows (auto-run, big ship-issues batches, wide
 deep-research fan-outs) are the plausible approachers. Also a session-wide WebSearch
 cap, default 200 (`CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`) — relevant to wide
 deep-research fan-outs.
+
+Concurrently-RUNNING subagent cap (v2.1.217): default 20
+(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), confirmed by binary-read 2026-07-22; at the
+cap the spawn ERRORS ("Concurrent subagent limit reached… Do not retry") rather than
+queuing — binary-read, live-unprobed. A third distinct limit (concurrent, vs §5 depth
+and the session-total above). Wide unnamed fan-outs (20+ validators in one message)
+are the plausible approachers.
 
 ## §7 Playwright browser is a session-global singleton
 One shared tab across the main loop and every sub-agent (same MCP server). Two agents
@@ -174,6 +219,9 @@ is invisible to already-running sessions. The "Agent type not found" fallback (d
 `general-purpose` briefed to read the def as prose) inherits NONE of the def's
 frontmatter — both the `model:` pin and any `tools:` restriction are lost; restate both
 in the fallback brief (probed 2026-07-02).
+Scope: this session-start caveat covers agent defs ONLY. Skills and commands live-reload
+mid-session as of Claude Code v2.1.216 (changelog line; observed 2026-07-20 — skills
+copied into `~/.claude/skills/` mid-session were invocable without a restart).
 
 ## §10 Misc probed gotchas
 - `EnterWorktree` cannot create a worktree while the session is already in one (probed
@@ -183,8 +231,13 @@ in the fallback brief (probed 2026-07-02).
   travel in messages, truth lives in files/boards; senders stamp state, receivers
   re-check live artifacts, producers batch feedback then grep-verify before "done".
 
-## §11 zsh ties `path`↔`PATH` — never name a shell variable `path`
-Inline Bash-tool commands are eval'd under the user's shell (zsh here), and zsh links
+## §11 The Bash tool's shell is the user's shell — bash-only idioms fail silently
+Everything below was probed under **zsh 5.9**, the shell on the machine this suite runs
+on. If your login shell is bash these specific traps don't apply — but the general
+lesson does: inline Bash-tool commands are eval'd under *your* shell, not a guaranteed
+bash, and the failures below are all **silent** — no error, no fallback.
+
+**`path`↔`PATH` — never name a shell variable `path`.** zsh links
 the lowercase array `path` to `$PATH` (likewise `cdpath`, `fpath`, `manpath`,
 `mailpath`; `status` is read-only). Any assignment — `read -r path`, `for path in …`,
 `path=…` — silently rewrites the command search path; the symptom is
@@ -203,6 +256,36 @@ bash doesn't tie `path`↔`PATH`.
   independently re-verified same day in another session (`path=/tmp/nowhere;
   git --version` → exit 127; `wpath` control passes).
 
+**Unquoted `=`-prefixed words** are a separate trap in the same shell: zsh's `=cmd`
+filename expansion (EQUALS option, on by default) rewrites any unquoted argument
+beginning with `=` to the full path of the command named by the rest, and kills the
+whole line when none exists — `echo ===FOO===` → `zsh:1: ==FOO=== not found`, exit 1,
+`echo` never runs (probed 2026-07-23). Bites `===`-style sentinel/delimiter args;
+quote them (`echo "===FOO==="`).
+
+**Bash-only parameters and devices** read as empty or missing, so the check built on
+them silently becomes a no-op (all probed 2026-07-25):
+- `${PIPESTATUS[0]}` → **empty string**; zsh's equivalent is the lowercase, 1-indexed
+  `${pipestatus[1]}`. The natural spelling of the gate is the dangerous one: zsh's `[`
+  evaluates an empty operand as 0, so `… | tail -3; [ "${PIPESTATUS[0]}" -eq 0 ]` is
+  `0 -eq 0` → **true on a failing command** — it inverts the gate it exists to provide,
+  with no output. (Unquoted `[ ${PIPESTATUS[0]} -eq 0 ]` instead dies
+  `[:1: unknown condition: -eq` and fails closed; `= "0"` also fails closed. Only the
+  quoted numeric form silently passes — probed all three.) Portable fix:
+  `set -o pipefail; <cmd> 2>&1 | tail -N; echo EXIT=$?` — `pipefail` works in zsh
+  (`false | tail -1` → `$?` is 1 with it, 0 without).
+- `/dev/tcp/<host>/<port>` does **not exist** — bash synthesizes that device, zsh reads
+  it as a plain path. Every redirect fails `no such file or directory`, exit 1,
+  *whether or not anything is listening*, so a free-port probe written
+  `(echo > /dev/tcp/127.0.0.1/$p) || use_port $p` reports **every** port free and hands
+  back a port another process is already serving. Probe with
+  `ss -ltn "( sport = :$p )"` and test the **output** — `ss` exits 0 either way. Where
+  you control the listener, prefer binding port 0 and reading back the OS-assigned port
+  (what `scripts/make-it-easy/` does).
+- Same class, swept out of this suite on 2026-07-25 — assume broken if reintroduced:
+  `mapfile`/`readarray`, `declare -A`, `local -n`, `${var,,}`/`${var^^}`. Run a
+  genuinely wanted bashism under `bash -c '…'`.
+
 ## §12 Skill-tool arg substitution rewrites literal `$0` in the loaded text
 When the Skill tool loads a skill WITH invocation args, every literal `$0` in the
 SKILL.md text is substituted with the args string in the copy the agent reads — the file
@@ -220,3 +303,22 @@ and a guard sentence warning about this must itself avoid the literal token (spe
   reading the SKILL.md from disk. codex-consult carries the one-line guard beside that
   snippet; grep the suite for `field-notes §12` to enumerate carriers, and for any other
   Skill-loadable file with a literal `$0` in an operative recipe.
+
+## §13 Agent `model:` overrides are honored in BOTH directions — no harness tier cap
+The Agent tool's `model:` override resolves to exactly the tier named, including tiers
+ABOVE the dispatching session's model. There is no mechanical ceiling; the tier cap in
+`CLAUDE-global.md` § Sub-agent delegation is a deliberate policy, not an enforced limit.
+Unpinned calls inherit the session model exactly (including variant suffixes such as
+`[1m]`). Worth knowing before you port that policy: it is the *only* thing preventing
+silent escalation, so dropping it means dropping the guarantee, not inheriting one.
+- **Corollary — never verify a pin by asking the agent.** A subagent's self-reported
+  model identity is unreliable: it will sometimes name a different model and invent a
+  plausible-but-fake ID for it. The objective discriminator is the `subagent_tokens`
+  figure in the Agent tool result — system-prompt size clusters tightly by resolved
+  tier, and a misreporting child still sits in its true tier's band.
+- Provenance: probed 2026-07-25 from an Opus 5 session, 8 dispatches. A top-tier pin
+  resolved there both times (~35.29k tokens); unpinned → the session model (35.25k);
+  `model:'haiku'` → Haiku 4.5 (28.43k); `model:'sonnet'` → Sonnet 5 in 3 of 5, while
+  2 of 5 self-reported a *higher* tier under two DIFFERENT ids (one of them not a
+  published model id) — yet all five sat in the same 40.84k band, i.e. all five really
+  were Sonnet.
