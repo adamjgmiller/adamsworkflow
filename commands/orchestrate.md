@@ -309,9 +309,8 @@ Don't write code in this mode. Produce a structured plan. Item 6 below governs w
 3. **Per-stage loop** — for each stage in plan order, dispatch **one
    stage-runner** (type `stage-runner`; stale-registry fallback per *Pick
    the sub-agent type by fit*). Pass an explicit `model:` on every
-   stage-runner dispatch — default `opus` (a conductor), `fable` only
-   when one of the stage's own children may warrant Fable per the
-   policy's escalation test (per-stage call); never leave it to inheritance — an unpinned dispatch inherits
+   stage-runner dispatch — `opus` (a conductor; Fable only if the user
+   named it); never leave it to inheritance — an unpinned dispatch inherits
    the session model, auto-Fabling the conductor on a Fable session.
    The stage-runner runs the stage's cycle
    internally, up to

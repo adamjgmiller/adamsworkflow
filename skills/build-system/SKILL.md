@@ -177,9 +177,8 @@ dispatch one named **`stage-runner`** agent per phase (`subagent_type: "stage-ru
 its definition at `~/.claude/agents/stage-runner.md` carries the full contract — on
 "Agent type not found", a stale session registry, dispatch `general-purpose` briefed to
 read and follow that file). Pass an explicit `model:` on every stage-runner dispatch —
-default `opus` (conductor), `fable` only when a child of that phase may warrant Fable per
-the policy's escalation test (per-phase call); unpinned dispatches inherit the session model (auto-Fable on a Fable
-session). Brief it with the artifact, the lenses/angles, a convergence
+`opus` (conductor; Fable only if the user named it) — unpinned dispatches inherit the
+session model (auto-Fable on a Fable session). Brief it with the artifact, the lenses/angles, a convergence
 budget, **the repo root/worktree** (every git command and the verify run from there —
 `cd` at the start of each Bash call or `git -C`; sub-agent cwd does not persist between
 calls), the repo's commit convention (commit fixes per round; **never push**), and the

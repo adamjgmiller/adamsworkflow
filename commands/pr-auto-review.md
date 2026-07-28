@@ -44,7 +44,7 @@ Soft blockers — warn and continue:
 
 ## Step 2 — Dispatch
 
-**Always spawn one `general-purpose` per-PR review-agent per PR — including when there's only one.** Even a single-PR run delegates: Steps 3–16 generate heavy intermediate volume (per-lens fan-out, fix loop, test runs) for a ~30-line report block, and a `general-purpose` sub-agent holds the `Agent` tool (Task fabric — it can spawn its own children; `~/.claude/docs/field-notes.md` §1), so the per-PR agent runs Step 7's fan-out and Step 9's fix loop itself. The main loop is a thin dispatcher from here: dispatch, wait, assemble (Step 17). Dispatch each per-PR agent with an explicit `model:` — default `opus` (conductor); escalate a given PR's agent to `fable` only when that PR may warrant a Fable lens in Step 7 (the per-lens ceiling is the per-PR agent's own tier, so an implicitly-Opus conductor can never grant one); never leave it to inheritance — an unpinned dispatch inherits the session model (auto-Fable on a Fable session).
+**Always spawn one `general-purpose` per-PR review-agent per PR — including when there's only one.** Even a single-PR run delegates: Steps 3–16 generate heavy intermediate volume (per-lens fan-out, fix loop, test runs) for a ~30-line report block, and a `general-purpose` sub-agent holds the `Agent` tool (Task fabric — it can spawn its own children; `~/.claude/docs/field-notes.md` §1), so the per-PR agent runs Step 7's fan-out and Step 9's fix loop itself. The main loop is a thin dispatcher from here: dispatch, wait, assemble (Step 17). Dispatch each per-PR agent with an explicit `model:` — `opus` (conductor; Fable only if the user named it); never leave it to inheritance — an unpinned dispatch inherits the session model (auto-Fable on a Fable session).
 
 Each per-PR agent's brief: *"Follow `~/.claude/commands/pr-auto-review.md` from Step 3 onward for PR #N. Anchor every Bash call to the worktree you set up in Step 3 (`cd` it first in each call, or `git -C`) — your cwd resets between calls (field-notes §2). You are a stage-agent: fan out Step 7's lens reviewers as your own children and run Step 9's fix loop inline. All side effects are yours — the Step 12 push, Step 13's `gh pr ready`, and the Step 14 comment with its `before=`/`after=` footer happen inside you, never in your dispatcher. Codex available: <yes|no> (the dispatcher's Step 1 check) — if no, skip the codex-runner children, run lenses Opus-only, and note the degradation in your Step 14 comment. Force-rerun requested: <yes|no> (the invoker's explicit ask — Step 4's Force-rerun note) — if yes, skip Step 4's idempotency bail per that note. Finish by returning your Step 16 per-item report block as your final message — it auto-delivers to your dispatcher in your completion task-notification (field-notes §4)."*
 
@@ -269,7 +269,7 @@ The agent picks the lens set per-PR based on what the diff actually touches. Sta
 
 For each chosen lens, spawn **paired Opus + Codex review sub-agents in parallel**:
 
-**Opus lens reviewer** (`general-purpose`, one per lens — per-lens model per the model-selection policy: `opus` default, `fable` only for a lens passing the policy's escalation test, decided per-lens, never above your tier):
+**Opus lens reviewer** (`general-purpose`, one per lens — per-lens model per the model-selection policy: `opus` — a purely mechanical lens may drop to `sonnet`, but never escalate above Opus on your own judgment; a tier the user named overrides that):
 
 > You are reviewing PR #<N> ("<title>") through the **<lens-name>** lens specifically. Don't try to be comprehensive across all concerns — stay focused on the lens.
 >
@@ -487,7 +487,7 @@ The `@ before=<sha> after=<sha>` footer is **load-bearing** — Step 4's idempot
 Anywhere the agent faces a judgment call it would have stopped to ask about (which fixes are "meaningful," whether a divergence is a real bug, fork push fallback ambiguity, lens-coverage gaps), use this protocol:
 
 1. Frame the decision.
-2. Fan out an opinion leaf (`model: opus`/`fable` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel.
+2. Fan out an opinion leaf (`model: opus` per the model-selection policy) + a Codex `ask` driver leaf (`model: sonnet`) in parallel.
 3. Synthesize with `review-fix-loop.md` Lane 2's **unattended variant** (the canonical statement of the extended chain: reversibility → behavior preservation → blast radius → higher confidence → least action → first option in the framing — logging which terminal rule fired).
 4. Log in `plans/<branch>.md` Decisions section; surface meaningful ones in the PR comment.
 5. Proceed.

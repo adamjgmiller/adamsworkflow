@@ -224,7 +224,7 @@ deliberately and commit to its mechanics.
   fans out its own leaves, `codex-runner` for an external Codex (GPT) second opinion, and the
   domain builders when the deliverable calls for them — the `make-it-easy` and
   `visual-builder` agents, and the `frontend-design` *skill* (invoked via the Skill
-  tool inside an agent — it is not a dispatchable agent type). **Pick each teammate's model per the model-selection policy** — Sonnet for Codex-drivers, Opus↔Fable per-item for reasoning, conductors default Opus, all ceiling-capped. (In a
+  tool inside an agent — it is not a dispatchable agent type). **Pick each teammate's model per the model-selection policy** — Sonnet for Codex-drivers, Opus for reasoning and conductors, Fable only if the user named it. (In a
   Workflow, `agent()` nodes are always leaves — they can't spawn; size and pin their models per
   the fan-out rules.)
 - **Trust the artifact, not the report.** "Done, looks great" describes *intent*; the diff / the

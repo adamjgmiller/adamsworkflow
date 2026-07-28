@@ -71,7 +71,7 @@ For each round `r` in `1..max_rounds`:
 
 **Dispatch it and collect its result before 2b.** Dispatches are async by default (async-only at depth; a main-level `run_in_background: false` sync opt-in exists — field-notes §4) — the review child's completion arrives as a task-notification carrying its report, attached to your next tool result or re-waking you if you've ended your turn. The same holds for every dispatch in this loop — the 2a review agent, Lane 1/3 fixers, the Lane 2 Claude consult: collect each one's notification before acting on its lane. Belt-and-braces: the 2a brief below makes the child write `RUN_DIR/round-<r>-report.md` before returning — if its notification is ever lost, recover from the file instead of re-dispatching blind.
 
-Spawn a sub-agent (`general-purpose`, `model: opus`/`fable` per the model-selection policy) with this brief:
+Spawn a sub-agent (`general-purpose`, `model: opus` per the model-selection policy) with this brief:
 
 > Read and follow this file as your full instructions:
 >
@@ -168,7 +168,7 @@ Group `FIX` findings using judgment:
 - **One sub-agent per file** when each file has substantive, independent fixes.
 - **Parallel sub-agents** for groups in different files — send concurrent Agent calls in a single message.
 
-Each fix sub-agent (`general-purpose`, `model: opus`/`fable` per the model-selection policy) brief:
+Each fix sub-agent (`general-purpose`, `model: opus` per the model-selection policy) brief:
 
 > Apply the following fixes:
 >
@@ -194,7 +194,7 @@ Run both reviewers concurrently: send a single message containing the Claude con
 
 ##### Claude consult sub-agent
 
-`general-purpose`, `model: opus`/`fable` per the model-selection policy. Brief:
+`general-purpose`, `model: opus` per the model-selection policy. Brief:
 
 > You are giving a focused technical second opinion on decisions a code-review loop is about to make. You are **not** doing a fresh review — only weigh in on the listed items. **Read-only**: you're advising, not editing — never modify files or mutate git state; read the cited code and return recommendations only.
 >

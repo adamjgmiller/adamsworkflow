@@ -204,6 +204,13 @@ be expensive to catch downstream. Unbounded fan-outs — any stage whose
 agent count is unknown when the model is chosen — get pinned to a cheap
 model, always.
 
+The test only ranges over the tiers an agent may select for itself. The top
+tier is reserved for the human to name explicitly — no escalation test
+reaches it, so nothing lands there because an agent talked itself into it.
+That ceiling is a policy, not a harness limit: `model:` overrides resolve
+upward as well as downward ([field-notes](./docs/field-notes.md) §13), which
+is exactly why the discipline has to be written down rather than assumed.
+
 And the rule the 2026-07-13 log entry produced: explicit `model:` on every
 dispatch, because omission is not neutral. Anthropic's own documentation
 confirms that unpinned subagents inherit the session model

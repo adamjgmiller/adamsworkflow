@@ -126,8 +126,8 @@ Notes:
   · `SETUP{ok,branch,worktree,error}` · `FIX{ok,fixed_count,pushed,notes}` ·
   `FINALIZE{promoted,tests,comment_url}`.
 - **Dual-source per lens = a paired leaf**: `parallel(opusLeaf, codexLeaf)` (per-lens
-  model per the model-selection policy for `opusLeaf` — Opus default, Fable only for a
-  lens passing the policy's escalation test; `codexLeaf` is a Codex-driver →
+  model per the model-selection policy for `opusLeaf` — Opus; a purely mechanical lens
+  may drop to Sonnet, never escalate above Opus; `codexLeaf` is a Codex-driver →
   `model: 'sonnet'`). **Brief the `opusLeaf` (and every review-stage lens agent)
   read-only on the tree** — workflow agents hold Edit/Write, so a lens agent must be
   told it reviews and returns findings only: never edit/create/delete files, mutate

@@ -23,8 +23,9 @@ way, clickability into real code is the whole point — see § Link format.
   wholesale**: dispatch ONE `general-purpose` sub-agent with a pointer brief — *"read
   `~/.claude/commands/guided-tour.md` and execute it for scope `<flag/args>` in repo
   `<abs path>`; write to `<OUTPUT_PATH>`"* — passing `model:` explicitly per the
-  Communication-visuals tiering (Opus normally · Sonnet genuinely simple · Fable
-  complex + costly-if-subtly-wrong), never above the session tier. The content is all
+  Communication-visuals tiering (Opus normally · Sonnet genuinely simple) — never
+  escalate above Opus on your own judgment; the user naming a tier overrides that in
+  either direction. The content is all
   on disk, so a pointer brief is payload-complete. **The dispatched sub-agent IS the
   builder**: it runs Steps 1–3, writes the page(s) to `<OUTPUT_PATH>`, and returns —
   it does not re-enter this delegation bullet and does not run Step 4's serve/send.
